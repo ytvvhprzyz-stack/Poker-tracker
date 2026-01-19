@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poker Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body{font-family:-apple-system,Helvetica,Arial,sans-serif;background:#0d1117;color:#fff;margin:0;padding:16px;}
+h1,h2{margin-top:24px;text-align:center;}
+input,button{width:100%;padding:10px;margin:6px 0;border-radius:10px;border:none;font-size:16px;}
+button{background:#22c55e;color:#fff;font-weight:600;}
+table{width:100%;margin-top:10px;border-collapse:collapse;}
+th,td{padding:8px;text-align:center;border-bottom:1px solid #334155;}
+canvas{background:#fff;border-radius:12px;padding:10px;margin-top:16px;}
+.player-row{display:flex;align-items:center;margin:6px 0;}
+.player-row img{width:40px;height:40px;border-radius:50%;margin-right:10px;}
+input[type=number]{flex:1;}
+#error{background:#ef4444;color:#fff;padding:8px;border-radius:8px;margin-top:8px;display:none;text-align:center;}
+</style>
+</head>
+<body>
+
+<h1>♠️ Poker Tracker</h1>
+
+<h2>Inserisci partita</h2>
+<input type="date" id="date">
+
+<div id="inputs"></div>
+<div id="error">Errore: La somma deve essere 0!</div>
+<button onclick="saveGame()">Salva partita</button>
+
+<h2>🏆 Classifica totale (€)</h2>
+<table id="ranking"></table>
+
+<h2>📈 Guadagni cumulativi</h2>
+<canvas id="chart"></canvas>
+
+<script>
+// Giocatori con avatar
+const players=[
+  {name:"Chirurgo", avatar:"https://i.imgur.com/ProfChirurgo.png"},
+  {name:"Professore", avatar:"https://i.imgur.com/Professore.png"},
+  {name:"Barellista", avatar:"https://i.imgur.com/Barellista.png"},
+  {name:"Anestesista", avatar:"https://i.imgur.com/AnestesistaCattivo.png"},
+  {name:"Radiografo", avatar:"https://i.imgur.com/Radiografo.png"},
+  {name:"Caposala", avatar:"https://i.imgur.com/Caposala.png"}
+];
+
+let data=JSON.parse(localStorage.getItem("pokerData")||"[]");
+
+const inputsDiv=document.getElementById("inputs");
+players.forEach(p=>{
+  inputsDiv.innerHTML+=`
+  <div class="player-row">
+    <img src="${p.avatar}" alt="${p.name}">
+    <span>${p.name}</span>
+    <input type="number" id="${p.name}" placeholder="€">
+  </div>`;
+});
+
+function saveGame(){
+  const date=document.getElementById("date").value;
+  let sum=0;
+  const tempData=[];
+  players.forEach(p=>{
+    const val=document.getElementById(p.name).value;
+    if(val){
+      const intVal=parseInt(val);
+      sum+=intVal;
+      tempData.push({date,player:p.name,value:intVal});
+    }
+  });
+  if(sum!==0){
+    document.getElementById("error").style.display="block";
+    return;
+  } else {
+    document.getElementById("error").style.display="none";
+  }
+  data.push(...tempData);
+  localStorage.setItem("pokerData",JSON.stringify(data));
+  // reset input
+  players.forEach(p=>document.getElementById(p.name).value="");
+  render();
+}
+
+function render(){
+  const totals={};
+  players.forEach(p=>totals[p.name]=0);
+  data.forEach(d=>totals[d.player]+=d.value);
+
+  const rank=document.getElementById("ranking");
+  rank.innerHTML="<tr><th>Giocatore</th><th>€</th></tr>";
+  Object.entries(totals).sort((a,b)=>b[1]-a[1]).forEach(r=>{
+    const playerObj=players.find(p=>p.name===r[0]);
+    rank.innerHTML+=`<tr>
+      <td><img src="${playerObj.avatar}" style="width:24px;height:24px;border-radius:50%;margin-right:6px;">${r[0]}</td>
+      <td>${r[1]}</td>
+    </tr>`;
+  });
+
+  const labels=[...new Set(data.map(d=>d.date))];
+  const datasets=players.map((p,i)=>{
+    let sum=0;
+    const color=['#22c55e','#3b82f6','#f59e0b','#ef4444','#a855f7','#14b8a6'][i%6];
+    return{
+      label:p.name,
+      borderColor:color,
+      backgroundColor:'rgba(0,0,0,0)',
+      data:labels.map(l=>{
+        data.filter(d=>d.player===p.name && d.date<=l).forEach(d=>sum+=d.value);
+        return sum;
+      }),
+      tension:0.3
+    };
+  });
+
+  new Chart(document.getElementById("chart"),{
+    type:"line",
+    data:{labels,datasets},
+    options:{responsive:true, plugins:{legend:{position:'bottom'}}}
+  });
+}
+
+render();
+</script>
+
+</body>
+</html>
