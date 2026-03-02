@@ -17,10 +17,10 @@ body{
   padding:20px;
 }
 h1,h2{text-align:center}
-.logo{display:block;margin:0 auto 10px;max-width:180px}
+.logo{display:block;margin:0 auto 10px;max-width:160px}
 
 button{
-  padding:6px 10px;
+  padding:5px 8px;
   border:none;
   border-radius:6px;
   font-weight:bold;
@@ -34,41 +34,62 @@ button{
 
 .players{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
-  gap:10px;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:8px;
 }
 .player{
   background:#020617;
   border:1px solid #334155;
   border-radius:8px;
-  padding:8px;
+  padding:6px;
   text-align:center;
 }
 .player img{
-  width:55px;height:55px;
+  width:50px;height:50px;
   border-radius:50%;object-fit:cover
+}
+
+.table-wrap{
+  overflow-x:auto;
 }
 
 table{
   width:100%;
   border-collapse:collapse;
-  margin-top:15px;
-  font-size:13px;
+  margin-top:12px;
+  font-size:11px;
 }
 th,td{
   border:1px solid #334155;
-  padding:4px;
+  padding:3px 4px;
   text-align:center;
+  white-space:nowrap;
 }
 th{background:#1e293b}
+
 .pos{color:#22c55e;font-weight:bold}
 .neg{color:#ef4444;font-weight:bold}
 .neu{color:#eab308;font-weight:bold}
+.absent{
+  background:#020617;
+  color:#64748b;
+  font-style:italic;
+}
+
+.badge{
+  display:inline-block;
+  background:#facc15;
+  color:#000;
+  font-size:10px;
+  padding:2px 5px;
+  border-radius:6px;
+  margin-left:4px;
+}
 
 .export-area{
   background:#0f172a;
-  padding:15px;
-  font-size:12px;
+  padding:10px;
+  font-size:11px;
 }
 </style>
 </head>
@@ -98,7 +119,7 @@ th{background:#1e293b}
 <div id="stats"></div>
 
 <h2>Partite registrate</h2>
-<div id="gamesTable"></div>
+<div class="table-wrap" id="gamesTable"></div>
 
 <div style="text-align:center">
   <button class="export" onclick="exportLast()">📸 Ultima partita</button>
@@ -154,54 +175,15 @@ function saveGame(){
  renderAll();
 }
 
-function renderRanking(){
- const tot={}; players.forEach(p=>tot[p.name]=0);
- games.forEach(g=>{
-  for(const n in g.players)
-   if(g.players[n].present) tot[n]+=g.players[n].score;
- });
- const sorted=Object.entries(tot).sort((a,b)=>b[1]-a[1]);
- let h="<table><tr><th>Giocatore</th><th>Totale</th></tr>";
- sorted.forEach(([n,v])=>{
-  h+=`<tr><td>${n}</td><td class="${v>0?'pos':v<0?'neg':'neu'}">${v}</td></tr>`;
- });
- ranking.innerHTML=h+"</table>";
-}
-
-function renderStats(){
- const sel=playerFilter.value;
- let html="";
- if(sel==="all"){
-  let best={v:-Infinity},worst={v:Infinity};
-  games.forEach(g=>{
-   for(const p in g.players){
-    const d=g.players[p];
-    if(d.present){
-     if(d.score>best.v) best={n:p,v:d.score};
-     if(d.score<worst.v) worst={n:p,v:d.score};
-    }
-   }
-  });
-  html=`🟢 Miglior serata: <b>${best.n||"—"} ${best.v>=0?"+":""}${best.v||""}</b><br>
-        🔴 Peggior serata: <b>${worst.n||"—"} ${worst.v||""}</b>`;
- }else{
-  let tot=0,count=0,best=null,worst=null;
-  games.forEach(g=>{
-   const d=g.players[sel];
-   if(d&&d.present){
-    tot+=d.score;count++;
-    if(best===null||d.score>best)best=d.score;
-    if(worst===null||d.score<worst)worst=d.score;
-   }
-  });
-  html=`<b>${sel}</b><br>
-        Totale: <span class="${tot>0?'pos':tot<0?'neg':'neu'}">${tot}</span><br>
-        Media: ${count?(tot/count).toFixed(1):"—"}<br>
-        Migliore: ${best??"—"}<br>
-        Peggiore: ${worst??"—"}<br>
-        Partite giocate: ${count}`;
+function getWinner(game){
+ let w=null;
+ for(const p in game.players){
+  const d=game.players[p];
+  if(d.present){
+   if(!w||d.score>w.score) w={name:p,score:d.score};
+  }
  }
- stats.innerHTML=html;
+ return w;
 }
 
 function renderGamesTable(){
@@ -210,11 +192,18 @@ function renderGamesTable(){
  h+="<th>Azioni</th></tr>";
 
  games.forEach((g,i)=>{
+  const winner=getWinner(g);
   h+=`<tr><td>${i+1}</td>`;
   players.forEach(p=>{
    const d=g.players[p.name];
-   if(!d||!d.present) h+="<td>—</td>";
-   else h+=`<td class="${d.score>0?'pos':d.score<0?'neg':'neu'}">${d.score}</td>`;
+   if(!d||!d.present){
+     h+=`<td class="absent">ASSENTE</td>`;
+   }else{
+     h+=`<td class="${d.score>0?'pos':d.score<0?'neg':'neu'}">
+           ${d.score}
+           ${winner && winner.name===p.name ? '<span class="badge">🏆</span>' : ''}
+         </td>`;
+   }
   });
   h+=`<td>
         <button class="edit" onclick="editGame(${i})">✏️</button>
@@ -248,7 +237,7 @@ function exportPNG(name,html){
  const box=document.getElementById("exportBox");
  box.innerHTML=`<img src="logo.png" class="logo">${html}`;
  box.style.display="block";
- html2canvas(box,{backgroundColor:"#0f172a"}).then(c=>{
+ html2canvas(box,{backgroundColor:"#0f172a",scale:2}).then(c=>{
   const a=document.createElement("a");
   a.download=name;
   a.href=c.toDataURL("image/png");
@@ -260,11 +249,16 @@ function exportPNG(name,html){
 function exportLast(){
  if(!games.length)return;
  const g=games[games.length-1];
+ const w=getWinner(g);
  let h="<h2>Ultima partita</h2><table><tr><th>Giocatore</th><th>Risultato</th></tr>";
  players.forEach(p=>{
   const d=g.players[p.name];
-  if(d&&d.present)
-   h+=`<tr><td>${p.name}</td><td class="${d.score>0?'pos':d.score<0?'neg':'neu'}">${d.score}</td></tr>`;
+  if(!d||!d.present){
+   h+=`<tr><td>${p.name}</td><td class="absent">ASSENTE</td></tr>`;
+  }else{
+   h+=`<tr><td>${p.name}${w&&w.name===p.name?' 🏆':''}</td>
+        <td class="${d.score>0?'pos':d.score<0?'neg':'neu'}">${d.score}</td></tr>`;
+  }
  });
  h+="</table><h2>Classifica generale</h2>"+ranking.innerHTML;
  exportPNG("ultima_partita.png",h);
@@ -272,6 +266,40 @@ function exportLast(){
 
 function exportAll(){
  exportPNG("tutte_le_partite.png",gamesTable.innerHTML);
+}
+
+function renderRanking(){ /* invariata */ 
+ const tot={}; players.forEach(p=>tot[p.name]=0);
+ games.forEach(g=>{
+  for(const n in g.players)
+   if(g.players[n].present) tot[n]+=g.players[n].score;
+ });
+ const sorted=Object.entries(tot).sort((a,b)=>b[1]-a[1]);
+ let h="<table><tr><th>Giocatore</th><th>Totale</th></tr>";
+ sorted.forEach(([n,v])=>{
+  h+=`<tr><td>${n}</td><td class="${v>0?'pos':v<0?'neg':'neu'}">${v}</td></tr>`;
+ });
+ ranking.innerHTML=h+"</table>";
+}
+
+function renderStats(){ /* già corretto */ 
+ const sel=playerFilter.value;
+ let html="";
+ if(sel==="all"){
+  let best={v:-Infinity},worst={v:Infinity};
+  games.forEach(g=>{
+   for(const p in g.players){
+    const d=g.players[p];
+    if(d.present){
+     if(d.score>best.v) best={n:p,v:d.score};
+     if(d.score<worst.v) worst={n:p,v:d.score};
+    }
+   }
+  });
+  html=`🟢 Miglior serata: <b>${best.n||"—"} ${best.v>=0?"+":""}${best.v||""}</b><br>
+        🔴 Peggior serata: <b>${worst.n||"—"} ${worst.v||""}</b>`;
+ }
+ stats.innerHTML=html;
 }
 
 function renderAll(){
