@@ -2,347 +2,268 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<title>Clinica Assenteisti – Poker</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
+<title>Poker Tracker – Clinica Assenteisti</title>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <style>
 body{
+  margin:0;
+  font-family:Arial,Helvetica,sans-serif;
   background:#0f172a;
   color:#e5e7eb;
-  font-family:Arial,sans-serif;
-  max-width:1200px;
-  margin:auto;
-  padding:20px;
 }
-h1,h2{text-align:center}
-.logo{display:block;margin:0 auto 10px;max-width:160px}
-
-button{
-  padding:5px 8px;
-  border:none;
-  border-radius:6px;
-  font-weight:bold;
-  cursor:pointer;
-  margin:2px;
+h1,h2{ text-align:center }
+.logo{
+  display:block;
+  margin:20px auto;
+  max-width:180px;
 }
-.save{background:#22c55e;color:#000}
-.edit{background:#eab308;color:#000}
-.del{background:#ef4444;color:#fff}
-.export{background:#38bdf8;color:#000}
-
-.players{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-  gap:8px;
-}
-.player{
-  background:#020617;
-  border:1px solid #334155;
-  border-radius:8px;
-  padding:6px;
-  text-align:center;
-}
-.player img{
-  width:50px;height:50px;
-  border-radius:50%;object-fit:cover
-}
-
-.table-wrap{
-  overflow-x:auto;
-}
+.container{ max-width:1200px; margin:auto; padding:15px }
 
 table{
   width:100%;
   border-collapse:collapse;
-  margin-top:12px;
-  font-size:11px;
+  margin-bottom:20px;
+  font-size:14px;
 }
 th,td{
   border:1px solid #334155;
-  padding:3px 4px;
+  padding:6px;
   text-align:center;
-  white-space:nowrap;
 }
-th{background:#1e293b}
+th{ background:#1e293b }
+tr.absent{ opacity:0.4 }
+.pos{ color:#22c55e; font-weight:bold }
+.neg{ color:#ef4444; font-weight:bold }
 
-.pos{color:#22c55e;font-weight:bold}
-.neg{color:#ef4444;font-weight:bold}
-.neu{color:#eab308;font-weight:bold}
-.absent{
-  background:#020617;
-  color:#64748b;
-  font-style:italic;
+button{
+  padding:8px 14px;
+  margin:5px;
+  border:none;
+  border-radius:6px;
+  background:#2563eb;
+  color:white;
+  cursor:pointer;
 }
+button.danger{ background:#dc2626 }
+button.secondary{ background:#475569 }
 
 .badge{
-  display:inline-block;
-  background:#facc15;
-  color:#000;
-  font-size:10px;
-  padding:2px 5px;
-  border-radius:6px;
-  margin-left:4px;
+  background:#22c55e;
+  color:#052e16;
+  padding:3px 8px;
+  border-radius:10px;
+  font-size:12px;
+  margin-left:5px;
 }
 
-.export-area{
+#exportBox{
+  position:absolute;
+  left:-9999px;
+  top:0;
   background:#0f172a;
-  padding:10px;
-  font-size:11px;
+  color:white;
+  padding:20px;
 }
+.small{ font-size:12px }
 </style>
 </head>
 
 <body>
 
 <img src="logo.png" class="logo">
-<h1>Clinica Assenteisti</h1>
+
+<div class="container">
+
+<h1>Clinica Assenteisti – Poker Tracker</h1>
 
 <h2>Nuova partita</h2>
-<div class="players" id="players"></div>
 
-<div style="text-align:center">
-  <button class="save" onclick="saveGame()">Salva partita</button>
-</div>
-
-<h2>Classifica generale</h2>
-<div id="ranking"></div>
-
-<h2>Statistiche</h2>
-<div style="text-align:center">
-  Giocatore:
-  <select id="playerFilter" onchange="renderStats()">
-    <option value="all">Tutti</option>
-  </select>
-</div>
-<div id="stats"></div>
-
-<h2>Partite registrate</h2>
-<div class="table-wrap" id="gamesTable"></div>
-
-<div style="text-align:center">
-  <button class="export" onclick="exportLast()">📸 Ultima partita</button>
-  <button class="export" onclick="exportAll()">📸 Tutte le partite</button>
-</div>
-
-<div id="exportBox" class="export-area" style="display:none"></div>
-
+<table id="inputTable">
+<tr>
+  <th>Giocatore</th>
+  <th>Ha giocato</th>
+  <th>Risultato</th>
+</tr>
 <script>
 const players=[
- {name:"Anestesista",img:"anestesista.png.jpg"},
- {name:"Chirurgo",img:"chirurgo.jpg"},
- {name:"Barellista",img:"barellista.jpg"},
- {name:"Professore",img:"professore.jpg"},
- {name:"Caposala",img:"caposala.jpg"},
- {name:"Radiografo",img:"radiografo.jpg"}
+ {n:"Anestesista",a:"anestesista.png.jpg"},
+ {n:"Barellista",a:"barellista.jpg"},
+ {n:"Caposala",a:"caposala.jpg"},
+ {n:"Professore",a:"professore.jpg"},
+ {n:"Chirurgo",a:"chirurgo.png"},
+ {n:"Radiografo",a:"radiografo.jpg"}
 ];
-
-const box=document.getElementById("players");
-const filter=document.getElementById("playerFilter");
-
 players.forEach(p=>{
- box.innerHTML+=`
- <div class="player" data-name="${p.name}">
-  <img src="${p.img}">
-  <div><b>${p.name}</b></div>
-  <label><input type="checkbox" class="present"> Presente</label>
-  <input type="number" class="score" value="0">
- </div>`;
- filter.innerHTML+=`<option value="${p.name}">${p.name}</option>`;
+ document.write(`
+ <tr class="player-row" data-name="${p.n}">
+   <td>${p.n}</td>
+   <td><input type="checkbox" class="present"></td>
+   <td><input type="number" class="score" value="0"></td>
+ </tr>
+ `);
 });
+</script>
+</table>
 
-let games=JSON.parse(localStorage.getItem("games")||"[]");
-let editIndex=null;
+<button onclick="saveGame()">Salva partita</button>
+
+<hr>
+
+<h2>Partite registrate</h2>
+<div style="overflow-x:auto">
+<table id="gamesTable"></table>
+</div>
+
+<button onclick="exportLast()">Scarica ultima partita</button>
+<button onclick="exportAll()">Scarica tutte le partite</button>
+
+<hr>
+
+<h2>Statistiche</h2>
+<select id="playerFilter" onchange="renderStats()">
+<option value="">Tutti</option>
+</select>
+<div id="stats"></div>
+
+</div>
+
+<div id="exportBox"></div>
+
+<script>
+function getGames(){
+ return JSON.parse(localStorage.getItem("games")||"[]");
+}
+function saveGames(g){
+ localStorage.setItem("games",JSON.stringify(g));
+}
 
 function saveGame(){
- const g={date:new Date().toLocaleString(),players:{}};
- document.querySelectorAll(".player").forEach(p=>{
-  const n=p.dataset.name;
-  const pr=p.querySelector(".present").checked;
-  const sc=Number(p.querySelector(".score").value||0);
-  g.players[n]={present:pr,score:pr?sc:null};
- });
-
- if(editIndex!==null){
-  games[editIndex]=g;
-  editIndex=null;
- }else{
-  games.push(g);
- }
-
- localStorage.setItem("games",JSON.stringify(games));
- renderAll();
+ try{
+   let games=getGames();
+   let game={date:new Date().toLocaleString(),players:{}};
+   document.querySelectorAll(".player-row").forEach(r=>{
+     const n=r.dataset.name;
+     const p=r.querySelector(".present").checked;
+     const v=Number(r.querySelector(".score").value||0);
+     game.players[n]={present:p,score:p?v:null};
+   });
+   games.push(game);
+   saveGames(games);
+   alert("Partita salvata");
+   render();
+ }catch(e){ alert("Errore"); console.error(e); }
 }
 
-function getWinner(game){
- let w=null;
- for(const p in game.players){
-  const d=game.players[p];
-  if(d.present){
-   if(!w||d.score>w.score) w={name:p,score:d.score};
-  }
- }
- return w;
+function render(){
+ renderTable();
+ renderStats();
 }
 
-function renderGamesTable(){
- let h="<table><tr><th>#</th>";
- players.forEach(p=>h+=`<th>${p.name}</th>`);
- h+="<th>Azioni</th></tr>";
+function renderTable(){
+ const g=getGames();
+ let html="<tr><th>Data</th>";
+ players.forEach(p=>html+=`<th>${p.n}</th>`);
+ html+="<th>Azioni</th></tr>";
 
- games.forEach((g,i)=>{
-  const winner=getWinner(g);
-  h+=`<tr><td>${i+1}</td>`;
-  players.forEach(p=>{
-   const d=g.players[p.name];
-   if(!d||!d.present){
-     h+=`<td class="absent">ASSENTE</td>`;
-   }else{
-     h+=`<td class="${d.score>0?'pos':d.score<0?'neg':'neu'}">
-           ${d.score}
-           ${winner && winner.name===p.name ? '<span class="badge">🏆</span>' : ''}
-         </td>`;
-   }
-  });
-  h+=`<td>
-        <button class="edit" onclick="editGame(${i})">✏️</button>
-        <button class="del" onclick="deleteGame(${i})">❌</button>
-       </td></tr>`;
+ g.forEach((game,i)=>{
+   html+=`<tr><td>${game.date}</td>`;
+   players.forEach(p=>{
+     const d=game.players[p.n];
+     if(!d || !d.present) html+=`<td class="absent">—</td>`;
+     else html+=`<td class="${d.score>=0?"pos":"neg"}">${d.score}</td>`;
+   });
+   html+=`
+   <td>
+     <button class="secondary" onclick="editGame(${i})">Mod</button>
+     <button class="danger" onclick="deleteGame(${i})">X</button>
+   </td></tr>`;
  });
- gamesTable.innerHTML=h+"</table>";
-}
-
-function editGame(i){
- const g=games[i];
- document.querySelectorAll(".player").forEach(p=>{
-  const n=p.dataset.name;
-  const d=g.players[n];
-  p.querySelector(".present").checked=d.present;
-  p.querySelector(".score").value=d.score||0;
- });
- editIndex=i;
- window.scrollTo({top:0,behavior:"smooth"});
+ document.getElementById("gamesTable").innerHTML=html;
 }
 
 function deleteGame(i){
- if(confirm("Eliminare la partita?")){
-  games.splice(i,1);
-  localStorage.setItem("games",JSON.stringify(games));
-  renderAll();
- }
+ let g=getGames();
+ g.splice(i,1);
+ saveGames(g);
+ render();
 }
 
-function exportPNG(name,html){
- const box=document.getElementById("exportBox");
- box.innerHTML=`<img src="logo.png" class="logo">${html}`;
- box.style.display="block";
- html2canvas(box,{backgroundColor:"#0f172a",scale:2}).then(c=>{
-  const a=document.createElement("a");
-  a.download=name;
-  a.href=c.toDataURL("image/png");
-  a.click();
-  box.style.display="none";
+function editGame(i){
+ const g=getGames()[i];
+ document.querySelectorAll(".player-row").forEach(r=>{
+   const d=g.players[r.dataset.name];
+   r.querySelector(".present").checked=d.present;
+   r.querySelector(".score").value=d.score||0;
  });
+ deleteGame(i);
+}
+
+function renderStats(){
+ const g=getGames();
+ let best=null,worst=null;
+ g.forEach(game=>{
+   for(let p in game.players){
+     const d=game.players[p];
+     if(!d.present)continue;
+     if(!best||d.score>best.s)best={p,s:d.score};
+     if(!worst||d.score<worst.s)worst={p,s:d.score};
+   }
+ });
+ let html="";
+ if(best)html+=`<p>🏆 Miglior serata: ${best.p} +${best.s}</p>`;
+ if(worst)html+=`<p>💀 Peggior serata: ${worst.p} ${worst.s}</p>`;
+ document.getElementById("stats").innerHTML=html;
 }
 
 function exportLast(){
- if(!games.length)return;
- const g=games[games.length-1];
- const w=getWinner(g);
- let h="<h2>Ultima partita</h2><table><tr><th>Giocatore</th><th>Risultato</th></tr>";
+ const g=getGames();
+ if(!g.length)return;
+ const game=g[g.length-1];
+ const box=document.getElementById("exportBox");
+ box.innerHTML=`<img src="logo.png" class="logo"><h2>Ultima partita</h2>`;
+ let t="<table><tr><th>Giocatore</th><th>Risultato</th></tr>";
  players.forEach(p=>{
-  const d=g.players[p.name];
-  if(!d||!d.present){
-   h+=`<tr><td>${p.name}</td><td class="absent">ASSENTE</td></tr>`;
-  }else{
-   h+=`<tr><td>${p.name}${w&&w.name===p.name?' 🏆':''}</td>
-        <td class="${d.score>0?'pos':d.score<0?'neg':'neu'}">${d.score}</td></tr>`;
-  }
+   const d=game.players[p.n];
+   if(!d.present)t+=`<tr class="absent"><td>${p.n}</td><td>—</td></tr>`;
+   else t+=`<tr><td>${p.n}</td><td>${d.score}</td></tr>`;
  });
- h+="</table><h2>Classifica generale</h2>"+ranking.innerHTML;
- exportPNG("ultima_partita.png",h);
+ t+="</table>";
+ box.innerHTML+=t;
+ html2canvas(box,{scale:2}).then(c=>{
+   const a=document.createElement("a");
+   a.download="ultima_partita.png";
+   a.href=c.toDataURL();
+   a.click();
+ });
 }
 
-<script>
 function exportAll(){
-  const box = document.getElementById("exportBox");
-
-  // Clona la tabella partite
-  const clone = document.getElementById("gamesTable").cloneNode(true);
-
-  // Forza layout completo (niente tagli)
-  clone.style.overflow = "visible";
-  clone.style.width = "max-content";
-
-  box.innerHTML = `
-    <img src="logo.png" class="logo">
-    <h2 style="text-align:center">Tutte le partite</h2>
-  `;
-  box.appendChild(clone);
-  box.style.display = "block";
-
-  // Forza la larghezza reale prima dello screenshot
-  const width = clone.scrollWidth;
-  const height = clone.scrollHeight;
-
-  html2canvas(box,{
-    backgroundColor:"#0f172a",
-    scale:2,
-    width: width,
-    height: height,
-    windowWidth: width
-  }).then(canvas=>{
-    const a=document.createElement("a");
-    a.download="tutte_le_partite.png";
-    a.href=canvas.toDataURL("image/png");
-    a.click();
-    box.style.display="none";
-  });
-}
-</script>
-
-function renderRanking(){ /* invariata */ 
- const tot={}; players.forEach(p=>tot[p.name]=0);
- games.forEach(g=>{
-  for(const n in g.players)
-   if(g.players[n].present) tot[n]+=g.players[n].score;
+ const box=document.getElementById("exportBox");
+ const clone=document.getElementById("gamesTable").cloneNode(true);
+ clone.style.width="max-content";
+ box.innerHTML=`<img src="logo.png" class="logo"><h2>Tutte le partite</h2>`;
+ box.appendChild(clone);
+ html2canvas(box,{
+   scale:2,
+   width:clone.scrollWidth,
+   windowWidth:clone.scrollWidth
+ }).then(c=>{
+   const a=document.createElement("a");
+   a.download="tutte_le_partite.png";
+   a.href=c.toDataURL();
+   a.click();
  });
- const sorted=Object.entries(tot).sort((a,b)=>b[1]-a[1]);
- let h="<table><tr><th>Giocatore</th><th>Totale</th></tr>";
- sorted.forEach(([n,v])=>{
-  h+=`<tr><td>${n}</td><td class="${v>0?'pos':v<0?'neg':'neu'}">${v}</td></tr>`;
- });
- ranking.innerHTML=h+"</table>";
 }
 
-function renderStats(){ /* già corretto */ 
- const sel=playerFilter.value;
- let html="";
- if(sel==="all"){
-  let best={v:-Infinity},worst={v:Infinity};
-  games.forEach(g=>{
-   for(const p in g.players){
-    const d=g.players[p];
-    if(d.present){
-     if(d.score>best.v) best={n:p,v:d.score};
-     if(d.score<worst.v) worst={n:p,v:d.score};
-    }
-   }
-  });
-  html=`🟢 Miglior serata: <b>${best.n||"—"} ${best.v>=0?"+":""}${best.v||""}</b><br>
-        🔴 Peggior serata: <b>${worst.n||"—"} ${worst.v||""}</b>`;
- }
- stats.innerHTML=html;
-}
+players.forEach(p=>{
+ const o=document.createElement("option");
+ o.value=p.n;
+ o.textContent=p.n;
+ document.getElementById("playerFilter").appendChild(o);
+});
 
-function renderAll(){
- renderRanking();
- renderStats();
- renderGamesTable();
-}
-
-renderAll();
+render();
 </script>
 
 </body>
