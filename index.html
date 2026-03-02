@@ -28,13 +28,14 @@ th{background:#020617}
 tr:nth-child(even){background:#020617}
 .pos{color:#22c55e;font-weight:700}
 .neg{color:#ef4444;font-weight:700}
-.hidden{position:absolute;left:-9999px;top:-9999px;width:1000px;background:#020617;color:#e5e7eb;padding:20px}
-.logo{width:140px;margin:auto;display:block}
+.hidden{position:absolute;left:-9999px;top:-9999px;width:1000px;background:#020617;padding:20px}
+.logo{width:140px;display:block;margin:0 auto 20px}
 </style>
 </head>
 
 <body>
 <h1>♠ Clinica Assenteisti Poker</h1>
+
 <div class="container">
 
 <div class="card">
@@ -55,28 +56,27 @@ tr:nth-child(even){background:#020617}
 
 <div class="card">
 <h3>Partite registrate</h3>
-<table id="games"></table>
+<table id="gamesTable"></table>
 </div>
 
 <div class="card">
 <h3>📤 Condivisione</h3>
-<button class="gray" onclick="exportLast()">📸 Report ultima partita</button>
+<button class="gray" onclick="exportLast()">📸 Ultima partita</button>
 <button class="gray" onclick="exportAll()">📊 Storico completo</button>
 </div>
 
 </div>
 
-<!-- AREA EXPORT ULTIMA -->
+<!-- EXPORT AREE -->
 <div id="exportLastArea" class="hidden">
 <img src="logo.jpg" class="logo">
 <h2>Ultima partita</h2>
-<div id="lastResult"></div>
+<div id="exportLastResults"></div>
 <h2>Classifica generale</h2>
 <table id="exportRanking"></table>
 <canvas id="exportChart"></canvas>
 </div>
 
-<!-- AREA EXPORT TUTTE -->
 <div id="exportAllArea" class="hidden">
 <img src="logo.jpg" class="logo">
 <h2>Storico partite</h2>
@@ -93,12 +93,14 @@ const players=[
  {name:"Caposala",img:"caposala.jpg",color:"#f97316"}
 ];
 
-let games=JSON.parse(localStorage.getItem("games")||"[]");
+let games = JSON.parse(localStorage.getItem("games") || "[]");
 let chart;
 
 function renderPlayers(){
+ const box=document.getElementById("players");
+ box.innerHTML="";
  players.forEach(p=>{
-  playersDiv.innerHTML+=`
+  box.innerHTML+=`
   <div class="player">
    <img src="${p.img}">
    <div>${p.name}</div>
@@ -109,7 +111,9 @@ function renderPlayers(){
 
 function saveGame(){
  let g={date:new Date().toLocaleString(),scores:{}};
- players.forEach(p=>g.scores[p.name]=+document.getElementById("inp-"+p.name).value||0);
+ players.forEach(p=>{
+  g.scores[p.name]=Number(document.getElementById("inp-"+p.name).value)||0;
+ });
  games.push(g);
  localStorage.setItem("games",JSON.stringify(games));
  renderAll();
@@ -123,28 +127,36 @@ function totals(){
 
 function renderRanking(){
  let t=totals();
- ranking.innerHTML=
- `<tr>${players.map(p=>`<th>${p.name}</th>`).join("")}</tr>
-  <tr>${players.map(p=>{
-   let v=t[p.name];
-   return `<td class="${v>=0?'pos':'neg'}">${v}</td>`;
-  }).join("")}</tr>`;
- exportRanking.innerHTML=ranking.innerHTML;
+ let html=`<tr>${players.map(p=>`<th>${p.name}</th>`).join("")}</tr><tr>`;
+ players.forEach(p=>{
+  let v=t[p.name];
+  html+=`<td class="${v>=0?'pos':'neg'}">${v}</td>`;
+ });
+ html+="</tr>";
+ ranking.innerHTML=html;
+ exportRanking.innerHTML=html;
 }
 
 function renderGames(){
- gamesTable=games.map((g,i)=>`
- <tr>
-  <td>${g.date}</td>
-  ${players.map(p=>`<td>${g.scores[p.name]}</td>`).join("")}
- </tr>`).join("");
- games.innerHTML=
- `<tr><th>Data</th>${players.map(p=>`<th>${p.name}</th>`).join("")}</tr>`+gamesTable;
- exportGames.innerHTML=games.innerHTML;
+ let html=`<tr><th>Data</th>${players.map(p=>`<th>${p.name}</th>`).join("")}<th></th></tr>`;
+ games.forEach((g,i)=>{
+  html+=`<tr><td>${g.date}</td>`;
+  players.forEach(p=>html+=`<td>${g.scores[p.name]}</td>`);
+  html+=`<td><button class="red" onclick="delGame(${i})">X</button></td></tr>`;
+ });
+ gamesTable.innerHTML=html;
+ exportGames.innerHTML=html.replace(/<button.*?<\/button>/g,"");
+}
+
+function delGame(i){
+ games.splice(i,1);
+ localStorage.setItem("games",JSON.stringify(games));
+ renderAll();
 }
 
 function renderChart(){
- let labels=games.map((_,i)=>`P${i+1}`);
+ if(chart)chart.destroy();
+ let labels=games.map((_,i)=>"P"+(i+1));
  let datasets=players.map(p=>{
   let sum=0;
   return{
@@ -154,15 +166,15 @@ function renderChart(){
    fill:false
   };
  });
- if(chart)chart.destroy();
  chart=new Chart(trendChart,{type:"line",data:{labels,datasets}});
  new Chart(exportChart,{type:"line",data:{labels,datasets}});
 }
 
 function exportLast(){
- let last=games[games.length-1];
- lastResult.innerHTML=players.map(p=>{
-  let v=last.scores[p.name];
+ if(!games.length)return;
+ let g=games[games.length-1];
+ exportLastResults.innerHTML=players.map(p=>{
+  let v=g.scores[p.name];
   return `<p>${p.name}: <b class="${v>=0?'pos':'neg'}">${v}</b></p>`;
  }).join("");
  html2canvas(exportLastArea).then(c=>{
