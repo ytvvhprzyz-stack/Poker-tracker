@@ -7,7 +7,6 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 body{margin:0;font-family:Inter;background:#0f172a;color:#e5e7eb}
@@ -48,12 +47,6 @@ select{padding:6px;border-radius:8px}
 <button class="green" onclick="saveGame()">Salva partita</button>
 </div>
 
-<!-- ANDAMENTO -->
-<div class="card">
-<h3>📈 Andamento</h3>
-<canvas id="trendChart"></canvas>
-</div>
-
 <!-- CLASSIFICA -->
 <div class="card">
 <h3>Classifica generale</h3>
@@ -78,7 +71,7 @@ select{padding:6px;border-radius:8px}
 <!-- EXPORT -->
 <div class="card">
 <h3>📤 Condivisione</h3>
-<button class="gray" onclick="exportLast()">📸 Report ultima partita</button>
+<button class="gray" onclick="exportLast()">📸 Ultima partita</button>
 <button class="gray" onclick="exportAll()">📊 Storico completo</button>
 </div>
 
@@ -92,7 +85,6 @@ select{padding:6px;border-radius:8px}
 <h3 id="exportAwards"></h3>
 <h2>Classifica generale</h2>
 <table id="exportRanking"></table>
-<canvas id="exportChart"></canvas>
 </div>
 
 <!-- EXPORT TUTTE -->
@@ -104,16 +96,15 @@ select{padding:6px;border-radius:8px}
 
 <script>
 const players=[
- {name:"Chirurgo",img:"chirurgo.jpg",color:"#22c55e"},
- {name:"Professore",img:"professore.jpg",color:"#38bdf8"},
- {name:"Barellista",img:"barellista.jpg",color:"#eab308"},
- {name:"Anestesista",img:"anestesista.png.jpg",color:"#ef4444"},
- {name:"Radiografo",img:"radiografo.jpg",color:"#a855f7"},
- {name:"Caposala",img:"caposala.jpg",color:"#f97316"}
+ {name:"Chirurgo",img:"chirurgo.jpg"},
+ {name:"Professore",img:"professore.jpg"},
+ {name:"Barellista",img:"barellista.jpg"},
+ {name:"Anestesista",img:"anestesista.png.jpg"},
+ {name:"Radiografo",img:"radiografo.jpg"},
+ {name:"Caposala",img:"caposala.jpg"}
 ];
 
-let games=JSON.parse(localStorage.getItem("games")||"[]");
-let chart;
+let games = JSON.parse(localStorage.getItem("games") || "[]");
 
 players.forEach(p=>{
  let o=document.createElement("option");
@@ -187,18 +178,8 @@ function renderStats(){
  stats.innerHTML=html;
 }
 
-function renderChart(){
- if(chart)chart.destroy();
- let labels=games.map((_,i)=>"P"+(i+1));
- let datasets=players.map(p=>{
-  let sum=0;
-  return{label:p.name,data:games.map(g=>sum+=g.scores[p.name]),borderColor:p.color,fill:false};
- });
- chart=new Chart(trendChart,{type:"line",data:{labels,datasets}});
- new Chart(exportChart,{type:"line",data:{labels,datasets}});
-}
-
 function exportLast(){
+ if(!games.length)return;
  let g=games[games.length-1];
  let best=players.reduce((a,b)=>g.scores[a.name]>g.scores[b.name]?a:b);
  let worst=players.reduce((a,b)=>g.scores[a.name]<g.scores[b.name]?a:b);
@@ -237,7 +218,6 @@ function renderAll(){
  renderRanking();
  renderGames();
  renderStats();
- renderChart();
 }
 
 renderPlayers();
