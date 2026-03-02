@@ -20,19 +20,21 @@ h1,h2{text-align:center}
 .logo{display:block;margin:0 auto 10px;max-width:180px}
 
 button{
-  padding:8px 14px;
+  padding:6px 10px;
   border:none;
   border-radius:6px;
   font-weight:bold;
   cursor:pointer;
-  margin:4px;
+  margin:2px;
 }
 .save{background:#22c55e;color:#000}
+.edit{background:#eab308;color:#000}
+.del{background:#ef4444;color:#fff}
 .export{background:#38bdf8;color:#000}
 
 .players{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
   gap:10px;
 }
 .player{
@@ -43,19 +45,19 @@ button{
   text-align:center;
 }
 .player img{
-  width:60px;height:60px;
+  width:55px;height:55px;
   border-radius:50%;object-fit:cover
 }
 
 table{
   width:100%;
   border-collapse:collapse;
-  margin-top:20px;
-  font-size:14px;
+  margin-top:15px;
+  font-size:13px;
 }
 th,td{
   border:1px solid #334155;
-  padding:6px;
+  padding:4px;
   text-align:center;
 }
 th{background:#1e293b}
@@ -65,7 +67,8 @@ th{background:#1e293b}
 
 .export-area{
   background:#0f172a;
-  padding:20px;
+  padding:15px;
+  font-size:12px;
 }
 </style>
 </head>
@@ -86,14 +89,12 @@ th{background:#1e293b}
 <div id="ranking"></div>
 
 <h2>Statistiche</h2>
-
 <div style="text-align:center">
   Giocatore:
   <select id="playerFilter" onchange="renderStats()">
     <option value="all">Tutti</option>
   </select>
 </div>
-
 <div id="stats"></div>
 
 <h2>Partite registrate</h2>
@@ -111,16 +112,16 @@ const players=[
  {name:"Anestesista",img:"anestesista.png.jpg"},
  {name:"Chirurgo",img:"chirurgo.jpg"},
  {name:"Barellista",img:"barellista.jpg"},
+ {name:"Professore",img:"professore.jpg"},
  {name:"Caposala",img:"caposala.jpg"},
- {name:"Radiografo",img:"radiografo.jpg"},
- {name:"Professore",img:"professore.jpg"}
+ {name:"Radiografo",img:"radiografo.jpg"}
 ];
 
-const playersBox=document.getElementById("players");
+const box=document.getElementById("players");
 const filter=document.getElementById("playerFilter");
 
 players.forEach(p=>{
- playersBox.innerHTML+=`
+ box.innerHTML+=`
  <div class="player" data-name="${p.name}">
   <img src="${p.img}">
   <div><b>${p.name}</b></div>
@@ -131,6 +132,7 @@ players.forEach(p=>{
 });
 
 let games=JSON.parse(localStorage.getItem("games")||"[]");
+let editIndex=null;
 
 function saveGame(){
  const g={date:new Date().toLocaleString(),players:{}};
@@ -140,9 +142,15 @@ function saveGame(){
   const sc=Number(p.querySelector(".score").value||0);
   g.players[n]={present:pr,score:pr?sc:null};
  });
- games.push(g);
+
+ if(editIndex!==null){
+  games[editIndex]=g;
+  editIndex=null;
+ }else{
+  games.push(g);
+ }
+
  localStorage.setItem("games",JSON.stringify(games));
- alert("✅ Partita salvata");
  renderAll();
 }
 
@@ -163,7 +171,6 @@ function renderRanking(){
 function renderStats(){
  const sel=playerFilter.value;
  let html="";
-
  if(sel==="all"){
   let best={v:-Infinity},worst={v:Infinity};
   games.forEach(g=>{
@@ -175,10 +182,8 @@ function renderStats(){
     }
    }
   });
-  html=`
-   🟢 Miglior serata: <b>${best.n||"—"} ${best.v>=0?"+":""}${best.v||""}</b><br>
-   🔴 Peggior serata: <b>${worst.n||"—"} ${worst.v||""}</b>
-  `;
+  html=`🟢 Miglior serata: <b>${best.n||"—"} ${best.v>=0?"+":""}${best.v||""}</b><br>
+        🔴 Peggior serata: <b>${worst.n||"—"} ${worst.v||""}</b>`;
  }else{
   let tot=0,count=0,best=null,worst=null;
   games.forEach(g=>{
@@ -189,32 +194,54 @@ function renderStats(){
     if(worst===null||d.score<worst)worst=d.score;
    }
   });
-  html=`
-   <b>${sel}</b><br>
-   Totale: <span class="${tot>0?'pos':tot<0?'neg':'neu'}">${tot}</span><br>
-   Media: ${count?(tot/count).toFixed(1):"—"}<br>
-   Migliore serata: ${best??"—"}<br>
-   Peggiore serata: ${worst??"—"}<br>
-   Partite giocate: ${count}
-  `;
+  html=`<b>${sel}</b><br>
+        Totale: <span class="${tot>0?'pos':tot<0?'neg':'neu'}">${tot}</span><br>
+        Media: ${count?(tot/count).toFixed(1):"—"}<br>
+        Migliore: ${best??"—"}<br>
+        Peggiore: ${worst??"—"}<br>
+        Partite giocate: ${count}`;
  }
  stats.innerHTML=html;
 }
 
 function renderGamesTable(){
- let h="<table><tr><th>Partita</th>";
+ let h="<table><tr><th>#</th>";
  players.forEach(p=>h+=`<th>${p.name}</th>`);
- h+="</tr>";
+ h+="<th>Azioni</th></tr>";
+
  games.forEach((g,i)=>{
-  h+=`<tr><td>P${i+1}</td>`;
+  h+=`<tr><td>${i+1}</td>`;
   players.forEach(p=>{
    const d=g.players[p.name];
    if(!d||!d.present) h+="<td>—</td>";
    else h+=`<td class="${d.score>0?'pos':d.score<0?'neg':'neu'}">${d.score}</td>`;
   });
-  h+="</tr>";
+  h+=`<td>
+        <button class="edit" onclick="editGame(${i})">✏️</button>
+        <button class="del" onclick="deleteGame(${i})">❌</button>
+       </td></tr>`;
  });
  gamesTable.innerHTML=h+"</table>";
+}
+
+function editGame(i){
+ const g=games[i];
+ document.querySelectorAll(".player").forEach(p=>{
+  const n=p.dataset.name;
+  const d=g.players[n];
+  p.querySelector(".present").checked=d.present;
+  p.querySelector(".score").value=d.score||0;
+ });
+ editIndex=i;
+ window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function deleteGame(i){
+ if(confirm("Eliminare la partita?")){
+  games.splice(i,1);
+  localStorage.setItem("games",JSON.stringify(games));
+  renderAll();
+ }
 }
 
 function exportPNG(name,html){
