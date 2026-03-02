@@ -4,13 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Clinica Assenteisti Poker</title>
+
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <style>
 body{margin:0;font-family:Inter;background:#0f172a;color:#e5e7eb}
 h1{text-align:center;margin:20px}
-.container{max-width:960px;margin:auto;padding:16px}
+.container{max-width:1000px;margin:auto;padding:16px}
 .card{background:#020617;border-radius:16px;padding:16px;margin-bottom:20px}
 .players{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
 .player{text-align:center;border:1px solid #1e293b;border-radius:14px;padding:10px}
@@ -26,6 +27,7 @@ th{background:#020617}
 tr:nth-child(even){background:#020617}
 .pos{color:#22c55e;font-weight:700}
 .neg{color:#ef4444;font-weight:700}
+select{padding:6px;border-radius:8px}
 </style>
 </head>
 
@@ -33,27 +35,39 @@ tr:nth-child(even){background:#020617}
 <h1>♠ Clinica Assenteisti Poker</h1>
 <div class="container">
 
+<!-- NUOVA PARTITA -->
 <div class="card">
 <h3>Nuova partita</h3>
-<div class="players" id="players"></div>
-<br>
+<div class="players" id="players"></div><br>
 <button class="green" onclick="saveGame()">Salva partita</button>
 </div>
 
-<div class="card" id="exportArea">
+<!-- STATISTICHE -->
+<div class="card">
+<h3>Statistiche giocatore</h3>
+<select id="filterPlayer" onchange="renderStats()">
+<option value="ALL">Tutti</option>
+</select>
+<div id="stats"></div>
+</div>
+
+<!-- CLASSIFICA -->
+<div class="card" id="rankingArea">
 <h3>Classifica generale</h3>
 <table id="ranking"></table>
 </div>
 
-<div class="card">
+<!-- PARTITE -->
+<div class="card" id="gamesArea">
 <h3>Partite registrate</h3>
 <table id="games"></table>
 </div>
 
+<!-- EXPORT -->
 <div class="card">
-<h3>📤 Esporta</h3>
-<button class="gray" onclick="exportLastImage()">Scarica immagine ultima partita</button>
-<button class="gray" onclick="exportAll()">Esporta tutte le partite</button>
+<h3>📤 Condivisione</h3>
+<button class="gray" onclick="exportLast()">📸 Ultima partita</button>
+<button class="gray" onclick="exportAll()">📊 Tutte le partite</button>
 </div>
 
 </div>
@@ -62,8 +76,8 @@ tr:nth-child(even){background:#020617}
 const players=[
  {name:"Chirurgo",img:"chirurgo.jpg"},
  {name:"Professore",img:"professore.jpg"},
- {name:"Barellista",img:"barellista.jpg"},
- {name:"Anestesista",img:"anestesista.png.jpg"},
+ {name:"Barellista",img:"barellista.png.jpg"},
+ {name:"Anestesista",img:"anestesista.jpg"},
  {name:"Radiografo",img:"radiografo.jpg"},
  {name:"Caposala",img:"caposala.jpg"}
 ];
@@ -73,32 +87,17 @@ let games=JSON.parse(localStorage.getItem("games")||"[]");
 function renderPlayers(){
  document.getElementById("players").innerHTML=
  players.map(p=>`
-  <div class="player">
-   <img src="${p.img}">
-   <div>${p.name}</div>
-   <input type="number" value="0" id="inp-${p.name}">
-  </div>`).join("");
+ <div class="player">
+  <img src="${p.img}">
+  <div>${p.name}</div>
+  <input type="number" value="0" id="inp-${p.name}">
+ </div>`).join("");
 }
 
 function saveGame(){
  let g={date:new Date().toLocaleString(),scores:{}};
  players.forEach(p=>g.scores[p.name]=Number(document.getElementById("inp-"+p.name).value||0));
  games.push(g);
- localStorage.setItem("games",JSON.stringify(games));
- renderAll();
-}
-
-function importGames(){
- let t=document.getElementById("importText").value.trim().split("\n");
- t.forEach(r=>{
-  let g={date:new Date().toLocaleString(),scores:{}};
-  players.forEach(p=>g.scores[p.name]=0);
-  r.split(",").forEach(x=>{
-   let [n,v]=x.split(":");
-   if(n&&v)g.scores[n.trim()]=Number(v);
-  });
-  games.push(g);
- });
  localStorage.setItem("games",JSON.stringify(games));
  renderAll();
 }
@@ -123,11 +122,11 @@ function renderGames(){
  document.getElementById("games").innerHTML=
  `<tr><th>Data</th>${players.map(p=>`<th>${p.name}</th>`).join("")}<th></th></tr>`+
  games.map((g,i)=>`
-  <tr>
-   <td>${g.date}</td>
-   ${players.map(p=>`<td>${g.scores[p.name]}</td>`).join("")}
-   <td><button class="red" onclick="del(${i})">X</button></td>
-  </tr>`).join("");
+ <tr>
+  <td>${g.date}</td>
+  ${players.map(p=>`<td>${g.scores[p.name]}</td>`).join("")}
+  <td><button class="red" onclick="del(${i})">X</button></td>
+ </tr>`).join("");
 }
 
 function del(i){
@@ -136,8 +135,29 @@ function del(i){
  renderAll();
 }
 
-function exportLastImage(){
- html2canvas(document.getElementById("exportArea")).then(c=>{
+function renderStats(){
+ let f=document.getElementById("filterPlayer").value;
+ let html="";
+ players.forEach(p=>{
+  if(f!=="ALL" && f!==p.name) return;
+  let vals=games.map(g=>g.scores[p.name]);
+  let tot=vals.reduce((a,b)=>a+b,0);
+  if(vals.length===0) return;
+  html+=`
+  <p><b>${p.name}</b> →
+  Totale: <span class="${tot>=0?'pos':'neg'}">${tot}</span> |
+  Migliore: ${Math.max(...vals)} |
+  Peggiore: ${Math.min(...vals)} |
+  Partite: ${vals.length}
+  </p>`;
+ });
+ document.getElementById("stats").innerHTML=html;
+}
+
+function exportLast(){
+ let last=games[games.length-1];
+ if(!last)return;
+ html2canvas(document.getElementById("rankingArea")).then(c=>{
   let a=document.createElement("a");
   a.download="ultima_partita.png";
   a.href=c.toDataURL();
@@ -146,20 +166,28 @@ function exportLastImage(){
 }
 
 function exportAll(){
- let a=document.createElement("a");
- a.href=URL.createObjectURL(new Blob([JSON.stringify(games,null,2)],{type:"application/json"}));
- a.download="storico_partite.json";
- a.click();
+ html2canvas(document.getElementById("gamesArea")).then(c=>{
+  let a=document.createElement("a");
+  a.download="tutte_le_partite.png";
+  a.href=c.toDataURL();
+  a.click();
+ });
 }
 
 function renderAll(){
  renderRanking();
  renderGames();
+ renderStats();
 }
+
+players.forEach(p=>{
+ let o=document.createElement("option");
+ o.value=p.name;o.textContent=p.name;
+ filterPlayer.appendChild(o);
+});
 
 renderPlayers();
 renderAll();
 </script>
 </body>
 </html>
-
