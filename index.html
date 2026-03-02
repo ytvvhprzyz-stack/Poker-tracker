@@ -264,9 +264,43 @@ function exportLast(){
  exportPNG("ultima_partita.png",h);
 }
 
+<script>
 function exportAll(){
- exportPNG("tutte_le_partite.png",gamesTable.innerHTML);
+  const box = document.getElementById("exportBox");
+
+  // Clona la tabella partite
+  const clone = document.getElementById("gamesTable").cloneNode(true);
+
+  // Forza layout completo (niente tagli)
+  clone.style.overflow = "visible";
+  clone.style.width = "max-content";
+
+  box.innerHTML = `
+    <img src="logo.png" class="logo">
+    <h2 style="text-align:center">Tutte le partite</h2>
+  `;
+  box.appendChild(clone);
+  box.style.display = "block";
+
+  // Forza la larghezza reale prima dello screenshot
+  const width = clone.scrollWidth;
+  const height = clone.scrollHeight;
+
+  html2canvas(box,{
+    backgroundColor:"#0f172a",
+    scale:2,
+    width: width,
+    height: height,
+    windowWidth: width
+  }).then(canvas=>{
+    const a=document.createElement("a");
+    a.download="tutte_le_partite.png";
+    a.href=canvas.toDataURL("image/png");
+    a.click();
+    box.style.display="none";
+  });
 }
+</script>
 
 function renderRanking(){ /* invariata */ 
  const tot={}; players.forEach(p=>tot[p.name]=0);
