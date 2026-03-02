@@ -6,7 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 body{
@@ -67,8 +66,6 @@ th{background:#1e293b}
 .export-area{
   background:#0f172a;
   padding:20px;
-  max-width:1000px;
-  margin:auto;
 }
 </style>
 </head>
@@ -85,18 +82,26 @@ th{background:#1e293b}
   <button class="save" onclick="saveGame()">Salva partita</button>
 </div>
 
-<h2>📈 Andamento totale</h2>
-<canvas id="trendChart"></canvas>
-
 <h2>Classifica generale</h2>
 <div id="ranking"></div>
 
-<h2>Partite (vista tabellare)</h2>
-<div style="overflow-x:auto" id="gamesTable"></div>
+<h2>Statistiche</h2>
 
 <div style="text-align:center">
-  <button class="export" onclick="exportLast()">📸 Scarica ultima partita</button>
-  <button class="export" onclick="exportAll()">📸 Scarica tutte le partite</button>
+  Giocatore:
+  <select id="playerFilter" onchange="renderStats()">
+    <option value="all">Tutti</option>
+  </select>
+</div>
+
+<div id="stats"></div>
+
+<h2>Partite registrate</h2>
+<div id="gamesTable"></div>
+
+<div style="text-align:center">
+  <button class="export" onclick="exportLast()">📸 Ultima partita</button>
+  <button class="export" onclick="exportAll()">📸 Tutte le partite</button>
 </div>
 
 <div id="exportBox" class="export-area" style="display:none"></div>
@@ -112,6 +117,8 @@ const players=[
 ];
 
 const playersBox=document.getElementById("players");
+const filter=document.getElementById("playerFilter");
+
 players.forEach(p=>{
  playersBox.innerHTML+=`
  <div class="player" data-name="${p.name}">
@@ -120,10 +127,10 @@ players.forEach(p=>{
   <label><input type="checkbox" class="present"> Presente</label>
   <input type="number" class="score" value="0">
  </div>`;
+ filter.innerHTML+=`<option value="${p.name}">${p.name}</option>`;
 });
 
 let games=JSON.parse(localStorage.getItem("games")||"[]");
-let chart;
 
 function saveGame(){
  const g={date:new Date().toLocaleString(),players:{}};
@@ -139,7 +146,7 @@ function saveGame(){
  renderAll();
 }
 
-function rankingHTML(){
+function renderRanking(){
  const tot={}; players.forEach(p=>tot[p.name]=0);
  games.forEach(g=>{
   for(const n in g.players)
@@ -150,39 +157,64 @@ function rankingHTML(){
  sorted.forEach(([n,v])=>{
   h+=`<tr><td>${n}</td><td class="${v>0?'pos':v<0?'neg':'neu'}">${v}</td></tr>`;
  });
- return h+"</table>";
+ ranking.innerHTML=h+"</table>";
 }
 
-function gamesTableHTML(){
- let h="<table><tr><th>Giocatore</th>";
- games.forEach((g,i)=>h+=`<th>P${i+1}</th>`);
- h+="</tr>";
- players.forEach(p=>{
-  h+=`<tr><td>${p.name}</td>`;
+function renderStats(){
+ const sel=playerFilter.value;
+ let html="";
+
+ if(sel==="all"){
+  let best={v:-Infinity},worst={v:Infinity};
   games.forEach(g=>{
+   for(const p in g.players){
+    const d=g.players[p];
+    if(d.present){
+     if(d.score>best.v) best={n:p,v:d.score};
+     if(d.score<worst.v) worst={n:p,v:d.score};
+    }
+   }
+  });
+  html=`
+   🟢 Miglior serata: <b>${best.n||"—"} ${best.v>=0?"+":""}${best.v||""}</b><br>
+   🔴 Peggior serata: <b>${worst.n||"—"} ${worst.v||""}</b>
+  `;
+ }else{
+  let tot=0,count=0,best=null,worst=null;
+  games.forEach(g=>{
+   const d=g.players[sel];
+   if(d&&d.present){
+    tot+=d.score;count++;
+    if(best===null||d.score>best)best=d.score;
+    if(worst===null||d.score<worst)worst=d.score;
+   }
+  });
+  html=`
+   <b>${sel}</b><br>
+   Totale: <span class="${tot>0?'pos':tot<0?'neg':'neu'}">${tot}</span><br>
+   Media: ${count?(tot/count).toFixed(1):"—"}<br>
+   Migliore serata: ${best??"—"}<br>
+   Peggiore serata: ${worst??"—"}<br>
+   Partite giocate: ${count}
+  `;
+ }
+ stats.innerHTML=html;
+}
+
+function renderGamesTable(){
+ let h="<table><tr><th>Partita</th>";
+ players.forEach(p=>h+=`<th>${p.name}</th>`);
+ h+="</tr>";
+ games.forEach((g,i)=>{
+  h+=`<tr><td>P${i+1}</td>`;
+  players.forEach(p=>{
    const d=g.players[p.name];
    if(!d||!d.present) h+="<td>—</td>";
    else h+=`<td class="${d.score>0?'pos':d.score<0?'neg':'neu'}">${d.score}</td>`;
   });
   h+="</tr>";
  });
- return h+"</table>";
-}
-
-function renderTrend(){
- const labels=games.map((_,i)=>`P${i+1}`);
- const data=games.map(g=>{
-  let s=0;
-  for(const p in g.players)
-   if(g.players[p].present) s+=g.players[p].score;
-  return s;
- });
- if(chart) chart.destroy();
- chart=new Chart(document.getElementById("trendChart"),{
-  type:"line",
-  data:{labels,datasets:[{label:"Andamento totale",data,borderColor:"#38bdf8"}]},
-  options:{responsive:true}
- });
+ gamesTable.innerHTML=h+"</table>";
 }
 
 function exportPNG(name,html){
@@ -199,24 +231,26 @@ function exportPNG(name,html){
 }
 
 function exportLast(){
- if(!games.length)return alert("Nessuna partita");
- exportPNG(
-  "ultima_partita.png",
-  "<h2>Ultima partita</h2>"+rankingHTML()
- );
+ if(!games.length)return;
+ const g=games[games.length-1];
+ let h="<h2>Ultima partita</h2><table><tr><th>Giocatore</th><th>Risultato</th></tr>";
+ players.forEach(p=>{
+  const d=g.players[p.name];
+  if(d&&d.present)
+   h+=`<tr><td>${p.name}</td><td class="${d.score>0?'pos':d.score<0?'neg':'neu'}">${d.score}</td></tr>`;
+ });
+ h+="</table><h2>Classifica generale</h2>"+ranking.innerHTML;
+ exportPNG("ultima_partita.png",h);
 }
 
 function exportAll(){
- exportPNG(
-  "tutte_le_partite.png",
-  "<h2>Tutte le partite</h2>"+gamesTableHTML()
- );
+ exportPNG("tutte_le_partite.png",gamesTable.innerHTML);
 }
 
 function renderAll(){
- ranking.innerHTML=rankingHTML();
- gamesTable.innerHTML=gamesTableHTML();
- renderTrend();
+ renderRanking();
+ renderStats();
+ renderGamesTable();
 }
 
 renderAll();
