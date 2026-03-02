@@ -3,214 +3,169 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Clinica Assenteisti – Poker</title>
+<title>Clinica Assenteisti Poker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <style>
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto;background:#0f172a;color:#f8fafc}
-header{text-align:center;padding:16px}
-header img{width:140px;border-radius:16px}
-.card{background:#020617;margin:10px;padding:14px;border-radius:16px}
-h2{margin-top:0}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th,td{padding:6px;text-align:center}
-th{color:#94a3b8}
+body{margin:0;font-family:Inter;background:#0f172a;color:#e5e7eb}
+h1{text-align:center;margin:20px}
+.container{max-width:960px;margin:auto;padding:16px}
+.card{background:#020617;border-radius:16px;padding:16px;margin-bottom:20px}
+.players{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.player{text-align:center;border:1px solid #1e293b;border-radius:14px;padding:10px}
+.player img{width:70px;height:70px;border-radius:50%;object-fit:cover}
+.player input{width:70px;padding:6px;border-radius:8px;border:none;margin-top:6px;text-align:center}
+button{border:none;border-radius:10px;padding:10px 16px;font-weight:700;cursor:pointer}
+.green{background:#22c55e;color:#022c22}
+.red{background:#ef4444;color:#fff}
+.gray{background:#334155;color:#e5e7eb}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px;text-align:center}
+th{background:#020617}
+tr:nth-child(even){background:#020617}
 .pos{color:#22c55e;font-weight:700}
 .neg{color:#ef4444;font-weight:700}
-.badge{background:#7c2d12;color:#fff;padding:2px 6px;border-radius:6px;font-size:11px;margin-left:4px}
-select,button,input{width:100%;padding:8px;border-radius:10px;border:none;margin-top:6px}
-button{background:#2563eb;color:#fff;font-size:16px}
-button.danger{background:#dc2626}
-button.small{font-size:12px;padding:4px 6px}
-canvas{display:none}
 </style>
 </head>
 
 <body>
-
-<header>
-<img src="logo.png">
-<h1>Clinica Assenteisti</h1>
-</header>
+<h1>♠ Clinica Assenteisti Poker</h1>
+<div class="container">
 
 <div class="card">
-<h2>Nuova partita</h2>
-<div id="inputs"></div>
-<button onclick="saveGame()">Salva partita</button>
+<h3>Nuova partita</h3>
+<div class="players" id="players"></div>
+<br>
+<button class="green" onclick="saveGame()">Salva partita</button>
 </div>
 
 <div class="card">
-<h2>Filtro giocatore</h2>
-<select id="playerFilter" onchange="renderAll()">
-<option value="ALL">Tutti</option>
-</select>
+<h3>Importa partite</h3>
+<textarea id="importText" style="width:100%;height:120px"></textarea><br><br>
+<button class="gray" onclick="importGames()">Importa</button>
+</div>
+
+<div class="card" id="exportArea">
+<h3>Classifica generale</h3>
+<table id="ranking"></table>
 </div>
 
 <div class="card">
-<h2>Statistiche personali</h2>
-<div id="stats">Seleziona un giocatore</div>
+<h3>Partite registrate</h3>
+<table id="games"></table>
 </div>
 
 <div class="card">
-<h2>Classifica generale</h2>
-<table id="leaderboard"></table>
+<h3>📤 Esporta</h3>
+<button class="gray" onclick="exportLastImage()">Scarica immagine ultima partita</button>
+<button class="gray" onclick="exportAll()">Esporta tutte le partite</button>
 </div>
 
-<div class="card">
-<h2>Partite registrate</h2>
-<table id="gamesTable"></table>
 </div>
-
-<div class="card">
-<button onclick="exportImage()">📸 Scarica immagine serata</button>
-</div>
-
-<canvas id="canvas" width="1080" height="1600"></canvas>
 
 <script>
-const players=["Chirurgo","Professore","Barellista","Anestesista","Radiografo","Caposala"];
-const inputs=document.getElementById("inputs");
-const filter=document.getElementById("playerFilter");
-
-players.forEach(p=>{
-  inputs.innerHTML+=`<label>${p}</label><input type="number" id="in_${p}" value="0">`;
-  filter.innerHTML+=`<option value="${p}">${p}</option>`;
-});
+const players=[
+ {name:"Chirurgo",img:"chirurgo.jpg"},
+ {name:"Professore",img:"professore.jpg"},
+ {name:"Barellista",img:"barellista.jpg"},
+ {name:"Anestesista",img:"anestesista.jpg"},
+ {name:"Radiografo",img:"radiografo.jpg"},
+ {name:"Caposala",img:"caposala.jpg"}
+];
 
 let games=JSON.parse(localStorage.getItem("games")||"[]");
 
+function renderPlayers(){
+ document.getElementById("players").innerHTML=
+ players.map(p=>`
+  <div class="player">
+   <img src="${p.img}">
+   <div>${p.name}</div>
+   <input type="number" value="0" id="inp-${p.name}">
+  </div>`).join("");
+}
+
 function saveGame(){
-  let g={date:new Date().toLocaleDateString(),values:{}};
-  let sum=0;
-  players.forEach(p=>{
-    let v=parseInt(document.getElementById("in_"+p).value)||0;
-    g.values[p]=v;
-    sum+=v;
-    document.getElementById("in_"+p).value=0;
+ let g={date:new Date().toLocaleString(),scores:{}};
+ players.forEach(p=>g.scores[p.name]=Number(document.getElementById("inp-"+p.name).value||0));
+ games.push(g);
+ localStorage.setItem("games",JSON.stringify(games));
+ renderAll();
+}
+
+function importGames(){
+ let t=document.getElementById("importText").value.trim().split("\n");
+ t.forEach(r=>{
+  let g={date:new Date().toLocaleString(),scores:{}};
+  players.forEach(p=>g.scores[p.name]=0);
+  r.split(",").forEach(x=>{
+   let [n,v]=x.split(":");
+   if(n&&v)g.scores[n.trim()]=Number(v);
   });
-  if(sum!==0){alert("La somma deve essere 0");return;}
   games.push(g);
-  persist();
+ });
+ localStorage.setItem("games",JSON.stringify(games));
+ renderAll();
 }
 
-function persist(){
-  localStorage.setItem("games",JSON.stringify(games));
-  renderAll();
+function totals(){
+ let t={};players.forEach(p=>t[p.name]=0);
+ games.forEach(g=>players.forEach(p=>t[p.name]+=g.scores[p.name]));
+ return t;
 }
 
-function renderAll(){
-  renderLeaderboard();
-  renderGames();
-  renderStats();
-}
-
-function renderLeaderboard(){
-  let totals={}; players.forEach(p=>totals[p]=0);
-  games.forEach(g=>players.forEach(p=>totals[p]+=g.values[p]));
-  let html="<tr><th>Giocatore</th><th>Totale €</th></tr>";
-  Object.entries(totals).sort((a,b)=>b[1]-a[1]).forEach(([p,v],i)=>{
-    html+=`<tr><td>${i===0?"🏆 ":""}${p}</td><td class="${v>=0?"pos":"neg"}">${v}</td></tr>`;
-  });
-  leaderboard.innerHTML=html;
+function renderRanking(){
+ let t=totals();
+ document.getElementById("ranking").innerHTML=
+ `<tr>${players.map(p=>`<th>${p.name}</th>`).join("")}</tr>
+  <tr>${players.map(p=>{
+   let v=t[p.name];
+   return `<td class="${v>=0?'pos':'neg'}">${v}</td>`;
+  }).join("")}</tr>`;
 }
 
 function renderGames(){
-  let f=filter.value;
-  let html="<tr><th>Data</th>";
-  players.forEach(p=>html+=`<th>${p}</th>`);
-  html+="<th>Azioni</th></tr>";
-
-  games.forEach((g,i)=>{
-    if(f!=="ALL" && g.values[f]===0) return;
-    html+=`<tr><td>${g.date}</td>`;
-    players.forEach(p=>{
-      let v=g.values[p];
-      html+=`<td class="${v>=0?"pos":"neg"}">${v}</td>`;
-    });
-    html+=`<td>
-      <button class="small" onclick="editGame(${i})">✏️</button>
-      <button class="small danger" onclick="deleteGame(${i})">🗑️</button>
-    </td></tr>`;
-  });
-  gamesTable.innerHTML=html;
+ document.getElementById("games").innerHTML=
+ `<tr><th>Data</th>${players.map(p=>`<th>${p.name}</th>`).join("")}<th></th></tr>`+
+ games.map((g,i)=>`
+  <tr>
+   <td>${g.date}</td>
+   ${players.map(p=>`<td>${g.scores[p.name]}</td>`).join("")}
+   <td><button class="red" onclick="del(${i})">X</button></td>
+  </tr>`).join("");
 }
 
-function editGame(i){
-  let g=games[i];
-  players.forEach(p=>{
-    document.getElementById("in_"+p).value=g.values[p];
-  });
-  games.splice(i,1);
-  persist();
+function del(i){
+ games.splice(i,1);
+ localStorage.setItem("games",JSON.stringify(games));
+ renderAll();
 }
 
-function deleteGame(i){
-  if(confirm("Eliminare la partita?")){
-    games.splice(i,1);
-    persist();
-  }
-}
-
-function renderStats(){
-  let f=filter.value;
-  if(f==="ALL"){stats.innerHTML="Seleziona un giocatore";return;}
-  let played=0,total=0,worst=0;
-  games.forEach(g=>{
-    let v=g.values[f];
-    if(v!==0){played++;total+=v;worst=Math.min(worst,v);}
-  });
-  stats.innerHTML=`
-  <p>Partite giocate: <b>${played}</b></p>
-  <p>Saldo totale: <b class="${total>=0?"pos":"neg"}">${total} €</b></p>
-  <p>Peggior serata: <b class="neg">${worst} €</b> <span class="badge">💀</span></p>`;
-}
-
-function exportImage(){
-  if(!games.length){alert("Nessuna partita");return;}
-  const c=document.getElementById("canvas");
-  const ctx=c.getContext("2d");
-  ctx.fillStyle="#020617";ctx.fillRect(0,0,c.width,c.height);
-
-  ctx.fillStyle="white";
-  ctx.font="bold 56px Arial";
-  ctx.fillText("Clinica Assenteisti",60,80);
-  ctx.font="36px Arial";
-  ctx.fillText("Risultati ultima serata",60,140);
-
-  const last=games[games.length-1];
-  let y=220;
-  let max=Math.max(...Object.values(last.values));
-
-  players.forEach(p=>{
-    let v=last.values[p];
-    ctx.fillStyle=v>=0?"#22c55e":"#ef4444";
-    ctx.font=v===max?"bold 32px Arial":"30px Arial";
-    ctx.fillText(p+": "+v+" €"+(v===max?" 🏆":""),60,y);
-    y+=44;
-  });
-
-  y+=40;
-  ctx.fillStyle="white";
-  ctx.font="bold 36px Arial";
-  ctx.fillText("Classifica generale",60,y);
-  y+=50;
-
-  let totals={}; players.forEach(p=>totals[p]=0);
-  games.forEach(g=>players.forEach(p=>totals[p]+=g.values[p]));
-  Object.entries(totals).sort((a,b)=>b[1]-a[1]).forEach(([p,v],i)=>{
-    ctx.fillStyle=v>=0?"#22c55e":"#ef4444";
-    ctx.font=i===0?"bold 32px Arial":"30px Arial";
-    ctx.fillText((i===0?"🏆 ":"")+p+" "+v+" €",60,y);
-    y+=42;
-  });
-
-  const a=document.createElement("a");
-  a.download="clinica-assenteisti-serata.png";
-  a.href=c.toDataURL("image/png");
+function exportLastImage(){
+ html2canvas(document.getElementById("exportArea")).then(c=>{
+  let a=document.createElement("a");
+  a.download="ultima_partita.png";
+  a.href=c.toDataURL();
   a.click();
+ });
 }
 
+function exportAll(){
+ let a=document.createElement("a");
+ a.href=URL.createObjectURL(new Blob([JSON.stringify(games,null,2)],{type:"application/json"}));
+ a.download="storico_partite.json";
+ a.click();
+}
+
+function renderAll(){
+ renderRanking();
+ renderGames();
+}
+
+renderPlayers();
 renderAll();
 </script>
-
 </body>
 </html>
+
