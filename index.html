@@ -11,7 +11,7 @@
 
 <style>
 body{margin:0;font-family:Inter;background:#0f172a;color:#e5e7eb}
-h1{text-align:center;margin:20px}
+h1{text-align:center;margin:10px}
 .container{max-width:1100px;margin:auto;padding:16px}
 .card{background:#020617;border-radius:16px;padding:16px;margin-bottom:20px}
 .players{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
@@ -29,54 +29,73 @@ tr:nth-child(even){background:#020617}
 .pos{color:#22c55e;font-weight:700}
 .neg{color:#ef4444;font-weight:700}
 .hidden{position:absolute;left:-9999px;top:-9999px;width:1000px;background:#020617;padding:20px}
-.logo{width:140px;display:block;margin:0 auto 20px}
+.logo{width:140px;display:block;margin:0 auto 10px}
+select{padding:6px;border-radius:8px}
 </style>
 </head>
 
 <body>
+
+<img src="logo.jpg" class="logo">
 <h1>♠ Clinica Assenteisti Poker</h1>
 
 <div class="container">
 
+<!-- NUOVA PARTITA -->
 <div class="card">
 <h3>Nuova partita</h3>
 <div class="players" id="players"></div><br>
 <button class="green" onclick="saveGame()">Salva partita</button>
 </div>
 
+<!-- ANDAMENTO -->
 <div class="card">
 <h3>📈 Andamento</h3>
 <canvas id="trendChart"></canvas>
 </div>
 
+<!-- CLASSIFICA -->
 <div class="card">
 <h3>Classifica generale</h3>
 <table id="ranking"></table>
 </div>
 
+<!-- PARTITE -->
 <div class="card">
 <h3>Partite registrate</h3>
 <table id="gamesTable"></table>
 </div>
 
+<!-- STATISTICHE -->
+<div class="card">
+<h3>📊 Statistiche</h3>
+<select id="statsFilter" onchange="renderStats()">
+<option value="ALL">Tutti</option>
+</select>
+<div id="stats"></div>
+</div>
+
+<!-- EXPORT -->
 <div class="card">
 <h3>📤 Condivisione</h3>
-<button class="gray" onclick="exportLast()">📸 Ultima partita</button>
+<button class="gray" onclick="exportLast()">📸 Report ultima partita</button>
 <button class="gray" onclick="exportAll()">📊 Storico completo</button>
 </div>
 
 </div>
 
-<!-- EXPORT AREE -->
+<!-- EXPORT ULTIMA -->
 <div id="exportLastArea" class="hidden">
 <img src="logo.jpg" class="logo">
 <h2>Ultima partita</h2>
 <div id="exportLastResults"></div>
+<h3 id="exportAwards"></h3>
 <h2>Classifica generale</h2>
 <table id="exportRanking"></table>
 <canvas id="exportChart"></canvas>
 </div>
 
+<!-- EXPORT TUTTE -->
 <div id="exportAllArea" class="hidden">
 <img src="logo.jpg" class="logo">
 <h2>Storico partite</h2>
@@ -93,14 +112,19 @@ const players=[
  {name:"Caposala",img:"caposala.jpg",color:"#f97316"}
 ];
 
-let games = JSON.parse(localStorage.getItem("games") || "[]");
+let games=JSON.parse(localStorage.getItem("games")||"[]");
 let chart;
 
+players.forEach(p=>{
+ let o=document.createElement("option");
+ o.value=p.name;o.textContent=p.name;
+ statsFilter.appendChild(o);
+});
+
 function renderPlayers(){
- const box=document.getElementById("players");
- box.innerHTML="";
+ playersDiv.innerHTML="";
  players.forEach(p=>{
-  box.innerHTML+=`
+  playersDiv.innerHTML+=`
   <div class="player">
    <img src="${p.img}">
    <div>${p.name}</div>
@@ -111,9 +135,7 @@ function renderPlayers(){
 
 function saveGame(){
  let g={date:new Date().toLocaleString(),scores:{}};
- players.forEach(p=>{
-  g.scores[p.name]=Number(document.getElementById("inp-"+p.name).value)||0;
- });
+ players.forEach(p=>g.scores[p.name]=Number(document.getElementById("inp-"+p.name).value)||0);
  games.push(g);
  localStorage.setItem("games",JSON.stringify(games));
  renderAll();
@@ -148,10 +170,21 @@ function renderGames(){
  exportGames.innerHTML=html.replace(/<button.*?<\/button>/g,"");
 }
 
-function delGame(i){
- games.splice(i,1);
- localStorage.setItem("games",JSON.stringify(games));
- renderAll();
+function renderStats(){
+ let f=statsFilter.value;
+ let html="";
+ players.forEach(p=>{
+  if(f!=="ALL" && f!==p.name) return;
+  let vals=games.map(g=>g.scores[p.name]);
+  if(!vals.length) return;
+  let tot=vals.reduce((a,b)=>a+b,0);
+  html+=`<p><b>${p.name}</b> → Totale: <span class="${tot>=0?'pos':'neg'}">${tot}</span>,
+  Media: ${(tot/vals.length).toFixed(1)},
+  Migliore: ${Math.max(...vals)},
+  Peggiore: ${Math.min(...vals)},
+  Partite: ${vals.length}</p>`;
+ });
+ stats.innerHTML=html;
 }
 
 function renderChart(){
@@ -159,24 +192,24 @@ function renderChart(){
  let labels=games.map((_,i)=>"P"+(i+1));
  let datasets=players.map(p=>{
   let sum=0;
-  return{
-   label:p.name,
-   data:games.map(g=>sum+=g.scores[p.name]),
-   borderColor:p.color,
-   fill:false
-  };
+  return{label:p.name,data:games.map(g=>sum+=g.scores[p.name]),borderColor:p.color,fill:false};
  });
  chart=new Chart(trendChart,{type:"line",data:{labels,datasets}});
  new Chart(exportChart,{type:"line",data:{labels,datasets}});
 }
 
 function exportLast(){
- if(!games.length)return;
  let g=games[games.length-1];
+ let best=players.reduce((a,b)=>g.scores[a.name]>g.scores[b.name]?a:b);
+ let worst=players.reduce((a,b)=>g.scores[a.name]<g.scores[b.name]?a:b);
+
  exportLastResults.innerHTML=players.map(p=>{
   let v=g.scores[p.name];
   return `<p>${p.name}: <b class="${v>=0?'pos':'neg'}">${v}</b></p>`;
  }).join("");
+
+ exportAwards.innerHTML=`🏆 Miglior: ${best.name} | 💀 Peggior: ${worst.name}`;
+
  html2canvas(exportLastArea).then(c=>{
   let a=document.createElement("a");
   a.download="report_ultima_partita.png";
@@ -194,9 +227,16 @@ function exportAll(){
  });
 }
 
+function delGame(i){
+ games.splice(i,1);
+ localStorage.setItem("games",JSON.stringify(games));
+ renderAll();
+}
+
 function renderAll(){
  renderRanking();
  renderGames();
+ renderStats();
  renderChart();
 }
 
