@@ -6,7 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
 body{
@@ -47,7 +46,8 @@ button{
 }
 .player img{
   width:50px;height:50px;
-  border-radius:50%;object-fit:cover
+  border-radius:50%;
+  object-fit:cover
 }
 
 .table-wrap{overflow-x:auto}
@@ -100,12 +100,12 @@ th{background:#1e293b}
 <h2>Nuova partita</h2>
 <div class="players" id="players"></div>
 
-<div style="text-align:center; margin-top:15px;">
-  <button class="save" id="btnSave" onclick="saveGame()">Salva partita</button>
+<div style="text-align:center">
+  <button class="save" onclick="saveGame()">Salva partita</button>
 </div>
 
 <h2>Classifica generale</h2>
-<div id="ranking">Caricamento dati...</div>
+<div id="ranking"></div>
 
 <h2>Statistiche</h2>
 <div style="text-align:center">
@@ -119,7 +119,7 @@ th{background:#1e293b}
 <h2>Partite registrate</h2>
 <div class="table-wrap" id="gamesTable"></div>
 
-<div style="text-align:center; margin-top:20px;">
+<div style="text-align:center">
   <button class="export" onclick="exportLast()">📸 Ultima partita</button>
   <button class="export" onclick="exportAll()">📸 Tutte le partite</button>
 </div>
@@ -127,11 +127,6 @@ th{background:#1e293b}
 <div id="exportBox" class="export-area" style="display:none"></div>
 
 <script>
-// --- CONFIGURAZIONE SUPABASE INSERITA ---
-const SUPABASE_URL = "https://sthjdvkbckywnzixuzes.supabase.co";
-const SUPABASE_KEY = "EyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0aGpkdmtiY2t5d256aXh1emVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0OTE5NDIsImV4cCI6MjA4ODA2Nzk0Mn0.fE7kDHH9i1aGY_IqxRikLKwqnc0HMv1PN3FBo1ORyC4";
-const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
 const players=[
  {name:"Anestesista",img:"anestesista.png.jpg"},
  {name:"Chirurgo",img:"chirurgo.jpg"},
@@ -149,101 +144,72 @@ players.forEach(p=>{
  <div class="player" data-name="${p.name}">
   <img src="${p.img}">
   <div><b>${p.name}</b></div>
-  <label><input type="checkbox" class="present"> Presente</label>
-  <input type="number" class="score" value="0">
+  <input type="number" class="score" placeholder="Inserisci risultato">
  </div>`;
  filter.innerHTML+=`<option value="${p.name}">${p.name}</option>`;
 });
 
-let games=[];
-let editId=null;
+let games=JSON.parse(localStorage.getItem("games")||"[]");
+let editIndex=null;
 
-// CARICAMENTO DATI DAL DB
-async function loadGames() {
- const { data, error } = await _supabase
-  .from('partite')
-  .select('*')
-  .order('created_at', { ascending: true });
- 
- if (error) {
-    console.error("Errore caricamento:", error);
-    document.getElementById("ranking").innerHTML = "Errore database. Verifica RLS su Supabase.";
- } else {
-  games = data;
-  renderAll();
- }
-}
+function saveGame(){
+ const g={date:new Date().toLocaleString(),players:{}};
+ let total=0;
+ let atLeastOne=false;
 
-// SALVATAGGIO
-async function saveGame(){
- const btn = document.getElementById("btnSave");
- btn.disabled = true;
- 
- const gData = { date: new Date().toLocaleString(), players: {} };
  document.querySelectorAll(".player").forEach(p=>{
   const n=p.dataset.name;
-  const pr=p.querySelector(".present").checked;
-  const sc=Number(p.querySelector(".score").value||0);
-  gData.players[n]={present:pr,score:pr?sc:null};
+  const raw=p.querySelector(".score").value;
+
+  if(raw===""){
+   g.players[n]={present:false,score:null};
+  }else{
+   const sc=Number(raw);
+   total+=sc;
+   atLeastOne=true;
+   g.players[n]={present:true,score:sc};
+  }
  });
 
- if(editId !== null){
-  await _supabase.from('partite').update({ data: gData }).eq('id', editId);
-  editId = null;
-  btn.innerText = "Salva partita";
-  btn.className = "save";
- } else {
-  await _supabase.from('partite').insert([{ data: gData }]);
+ if(!atLeastOne){
+  alert("Inserisci almeno un risultato.");
+  return;
  }
 
- resetForm();
- await loadGames();
- btn.disabled = false;
-}
-
-function resetForm() {
- document.querySelectorAll(".present").forEach(c => c.checked = false);
- document.querySelectorAll(".score").forEach(i => i.value = 0);
-}
-
-// CANCELLAZIONE
-async function deleteGame(id){
- if(confirm("Eliminare la partita dal database condiviso?")){
-  await _supabase.from('partite').delete().eq('id', id);
-  await loadGames();
+ if(total!==0){
+  alert("⚠️ La somma deve essere 0. Totale attuale: "+total);
+  return;
  }
+
+ if(editIndex!==null){
+  games[editIndex]=g;
+  editIndex=null;
+ }else{
+  games.push(g);
+ }
+
+ localStorage.setItem("games",JSON.stringify(games));
+ document.querySelectorAll(".score").forEach(i=>i.value="");
+ renderAll();
 }
 
-// MODIFICA
-function editGame(id){
- const row = games.find(g => g.id === id);
- const g = row.data;
- document.querySelectorAll(".player").forEach(p=>{
-  const d=g.players[p.dataset.name];
-  p.querySelector(".present").checked=d?.present || false;
-  p.querySelector(".score").value=d?.score || 0;
- });
- editId=id;
- const btn = document.getElementById("btnSave");
- btn.innerText = "Aggiorna Partita";
- btn.className = "edit";
- window.scrollTo({top:0,behavior:"smooth"});
+function getWinner(game){
+ let w=null;
+ for(const p in game.players){
+  const d=game.players[p];
+  if(d.present && (!w || d.score>w.score))
+   w={name:p,score:d.score};
+ }
+ return w;
 }
 
-// --- LOGICA DI RENDERING ---
 function renderGamesTable(){
  let h="<table><tr><th>#</th>";
  players.forEach(p=>h+=`<th>${p.name}</th>`);
  h+="<th>Azioni</th></tr>";
 
- games.forEach((row,i)=>{
-  const g = row.data;
-  let winner = null;
-  for(const p in g.players){
-    const d = g.players[p];
-    if(d.present && (!winner || d.score > winner.score)) winner = {name:p, score:d.score};
-  }
-
+ games.forEach((g,i)=>{
+  const winner=getWinner(g);
   h+=`<tr><td>${i+1}</td>`;
   players.forEach(p=>{
    const d=g.players[p.name];
@@ -251,63 +217,109 @@ function renderGamesTable(){
     h+=`<td class="absent">ASSENTE</td>`;
    }else{
     h+=`<td class="${d.score>0?'pos':d.score<0?'neg':'neu'}">
-          ${d.score}${winner&&winner.name===p.name?'<span class="badge">🏆</span>':''}
+          ${d.score}
+          ${winner&&winner.name===p.name?'<span class="badge">🏆</span>':''}
         </td>`;
    }
   });
   h+=`<td>
-        <button class="edit" onclick="editGame(${row.id})">✏️</button>
-        <button class="del" onclick="deleteGame(${row.id})">❌</button>
+        <button class="edit" onclick="editGame(${i})">✏️</button>
+        <button class="del" onclick="deleteGame(${i})">❌</button>
        </td></tr>`;
  });
- document.getElementById("gamesTable").innerHTML = h + "</table>";
+ gamesTable.innerHTML=h+"</table>";
+}
+
+function editGame(i){
+ const g=games[i];
+ document.querySelectorAll(".player").forEach(p=>{
+  const d=g.players[p.dataset.name];
+  p.querySelector(".score").value=(d&&d.present)?d.score:"";
+ });
+ editIndex=i;
+ window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function deleteGame(i){
+ if(confirm("Eliminare la partita?")){
+  games.splice(i,1);
+  localStorage.setItem("games",JSON.stringify(games));
+  renderAll();
+ }
 }
 
 function renderRanking(){
  const tot={}; players.forEach(p=>tot[p.name]=0);
- games.forEach(row=>{
-  const g = row.data;
+ games.forEach(g=>{
   for(const n in g.players)
    if(g.players[n].present) tot[n]+=g.players[n].score;
  });
  const sorted=Object.entries(tot).sort((a,b)=>b[1]-a[1]);
  let h="<table><tr><th>Giocatore</th><th>Totale</th></tr>";
  sorted.forEach(([n,v])=>{
-  h+=`<tr><td>${n}</td><td class="${v>0?'pos':v<0?'neg':'neu'}">${v}</td></tr>`;
+  h+=`<tr><td>${n}</td>
+       <td class="${v>0?'pos':v<0?'neg':'neu'}">${v>0?"+":""}${v}</td></tr>`;
  });
- document.getElementById("ranking").innerHTML = h+"</table>";
+ ranking.innerHTML=h+"</table>";
 }
 
 function renderStats(){
- let best={v:-Infinity},worst={v:Infinity};
- games.forEach(row=>{
-  const g = row.data;
-  for(const p in g.players){
-   const d=g.players[p];
-   if(d.present){
-    if(d.score>best.v) best={n:p,v:d.score};
-    if(d.score<worst.v) worst={n:p,v:d.score};
+ const sel=playerFilter.value;
+
+ if(sel==="all"){
+  let best={v:-Infinity},worst={v:Infinity};
+  games.forEach(g=>{
+   for(const p in g.players){
+    const d=g.players[p];
+    if(d.present){
+     if(d.score>best.v) best={n:p,v:d.score};
+     if(d.score<worst.v) worst={n:p,v:d.score};
+    }
    }
+  });
+  stats.innerHTML=
+   `🟢 Miglior serata: <b>${best.n||"—"} ${best.v>0?"+":""}${best.v||0}</b><br>
+    🔴 Peggior serata: <b>${worst.n||"—"} ${worst.v||0}</b>`;
+ }else{
+  let played=0,total=0,best=-Infinity,worst=Infinity;
+
+  games.forEach(g=>{
+   const d=g.players[sel];
+   if(d&&d.present){
+    played++;
+    total+=d.score;
+    if(d.score>best) best=d.score;
+    if(d.score<worst) worst=d.score;
+   }
+  });
+
+  if(played===0){
+   stats.innerHTML="Nessuna partita giocata da "+sel;
+   return;
   }
- });
- document.getElementById("stats").innerHTML=`🟢 Miglior serata: <b>${best.n||"—"} +${best.v||0}</b><br>
-                   🔴 Peggior serata: <b>${worst.n||"—"} ${worst.v||0}</b>`;
+
+  const avg=(total/played).toFixed(1);
+
+  stats.innerHTML=
+   `<b>${sel}</b><br><br>
+    🎲 Partite giocate: <b>${played}</b><br>
+    💰 Totale: <b class="${total>0?'pos':total<0?'neg':'neu'}">${total>0?"+":""}${total}</b><br>
+    📈 Media: <b>${avg}</b><br>
+    🟢 Migliore: <b>${best>0?"+":""}${best}</b><br>
+    🔴 Peggiore: <b>${worst}</b>`;
+ }
 }
 
-function renderAll(){
- renderRanking();
- renderStats();
- renderGamesTable();
-}
-
-// EXPORT IMMAGINI
 function exportPNG(name,node){
  const box=document.getElementById("exportBox");
  box.innerHTML=`<img src="logo.png" class="logo">`;
  box.appendChild(node);
  box.style.display="block";
 
- html2canvas(box,{scale:2}).then(c=>{
+ const w=node.scrollWidth||box.scrollWidth;
+
+ html2canvas(box,{backgroundColor:"#0f172a",scale:2,width:w,windowWidth:w})
+ .then(c=>{
   const a=document.createElement("a");
   a.download=name;
   a.href=c.toDataURL("image/png");
@@ -316,21 +328,27 @@ function exportPNG(name,node){
  });
 }
 
-window.exportLast = function(){
+function exportLast(){
  if(!games.length)return;
  const wrap=document.createElement("div");
- wrap.innerHTML="<h2>Ultima partita</h2>"+document.getElementById("gamesTable").innerHTML+"<h2>Classifica generale</h2>"+document.getElementById("ranking").innerHTML;
+ wrap.innerHTML="<h2>Ultima partita</h2>"+gamesTable.innerHTML+
+                "<h2>Classifica generale</h2>"+ranking.innerHTML;
  exportPNG("ultima_partita.png",wrap);
 }
 
-window.exportAll = function(){
+function exportAll(){
  const clone=document.getElementById("gamesTable").cloneNode(true);
  clone.style.width="max-content";
  exportPNG("tutte_le_partite.png",clone);
 }
 
-// Avvio
-loadGames();
+function renderAll(){
+ renderRanking();
+ renderStats();
+ renderGamesTable();
+}
+
+renderAll();
 </script>
 
 </body>
