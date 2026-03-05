@@ -1,256 +1,451 @@
 <!DOCTYPE html>
-<html>
+<html lang="it">
 <head>
 <meta charset="UTF-8">
-<title>Poker Stagione 2026</title>
+<title>Clinica Assenteisti – Poker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <style>
-body{font-family:Arial;background:#111;color:white;padding:20px}
-h1{color:#00ffcc}
-table{border-collapse:collapse;margin-top:10px;width:100%}
-th,td{border:1px solid #333;padding:6px;text-align:center}
-th{background:#222}
-input{width:70px;padding:4px;background:#222;color:white;border:1px solid #444}
-button{padding:8px 12px;margin:5px;background:#00ffcc;border:none;cursor:pointer}
-.green{color:#00ff88;font-weight:bold}
-.red{color:#ff4444;font-weight:bold}
-.badge{background:gold;color:black;padding:2px 6px;border-radius:6px;font-size:12px}
-.notplayed{opacity:0.4}
-</style>
+body{
+background:#0f172a;
+color:#e5e7eb;
+font-family:Arial;
+max-width:1200px;
+margin:auto;
+padding:20px
+}
 
+h1,h2{text-align:center}
+
+.logo{
+display:block;
+margin:0 auto 10px;
+max-width:160px
+}
+
+button{
+padding:5px 8px;
+border:none;
+border-radius:6px;
+font-weight:bold;
+cursor:pointer;
+margin:2px
+}
+
+.save{background:#22c55e;color:#000}
+.edit{background:#eab308;color:#000}
+.del{background:#ef4444;color:#fff}
+
+.players{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+gap:8px
+}
+
+.player{
+background:#020617;
+border:1px solid #334155;
+border-radius:8px;
+padding:6px;
+text-align:center
+}
+
+.player img{
+width:50px;
+height:50px;
+border-radius:50%;
+object-fit:cover
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:12px;
+font-size:11px
+}
+
+th,td{
+border:1px solid #334155;
+padding:3px 4px;
+text-align:center;
+white-space:nowrap
+}
+
+th{background:#1e293b}
+
+.pos{color:#22c55e;font-weight:bold}
+.neg{color:#ef4444;font-weight:bold}
+.neu{color:#eab308;font-weight:bold}
+
+.absent{
+background:#020617;
+color:#64748b;
+font-style:italic
+}
+
+.badge{
+background:#facc15;
+color:#000;
+font-size:10px;
+padding:2px 5px;
+border-radius:6px;
+margin-left:4px
+}
+</style>
 </head>
+
 <body>
 
-<h1>Stagione 2026</h1>
+<img src="logo.png" class="logo">
+<h1>Clinica Assenteisti</h1>
 
-<div id="newGame"></div>
-<button onclick="saveGame()">Salva Partita</button>
-<button onclick="resetSeason()">Reset Stagione</button>
+<h2>Nuova partita</h2>
+<div class="players" id="players"></div>
 
-<h2>Classifica Generale</h2>
-<div id="leaderboard"></div>
+<div style="text-align:center">
+<button class="save" onclick="saveGame()">Salva partita</button>
+</div>
+
+<h2>Classifica generale</h2>
+<div id="ranking"></div>
 
 <h2>Statistiche</h2>
-<select id="playerFilter" onchange="loadStats()">
+
+<div style="text-align:center">
+Giocatore:
+<select id="playerFilter" onchange="renderStats()">
 <option value="all">Tutti</option>
 </select>
+</div>
+
 <div id="stats"></div>
+
+<h2>Partite registrate</h2>
+<div id="gamesTable"></div>
 
 <script>
 
-const { createClient } = supabase;
+const API_URL="https://script.google.com/macros/s/AKfycbz9dd0kPsH9LfpysTBHAz3gKxCFt-i9s9Zpfmzxi0VDFGoxtiEmAGETy08owwyygNvs/exec"
 
-const client = createClient(
-"https://mukmsgqryxjxbmthasox.supabase.co",
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11a21zZ3FyeXhqeGJtdGhhc294Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MjYwNjYsImV4cCI6MjA4ODEwMjA2Nn0.B88aCDYtbF5SKBe6xTP0TnaqtHGznTA4AEsFd75CZM8"
-);
+const players=[
+{name:"Anestesista",img:"anestesista.png.jpg"},
+{name:"Chirurgo",img:"chirurgo.jpg"},
+{name:"Barellista",img:"barellista.jpg"},
+{name:"Professore",img:"professore.jpg"},
+{name:"Caposala",img:"caposala.jpg"},
+{name:"Radiografo",img:"radiografo.jpg"}
+]
 
-let players=[];
-let seasonId=null;
+const box=document.getElementById("players")
+const filter=document.getElementById("playerFilter")
 
-init();
+players.forEach(p=>{
+box.innerHTML+=`
+<div class="player" data-name="${p.name}">
+<img src="${p.img}">
+<div><b>${p.name}</b></div>
+<input type="number" class="score" placeholder="Risultato">
+</div>`
+filter.innerHTML+=`<option value="${p.name}">${p.name}</option>`
+})
 
-async function init(){
+let games=[]
+let editIndex=null
 
-  const { data: season } = await client
-    .from("seasons")
-    .select("*")
-    .eq("name","2026")
-    .single();
+async function loadGames(){
 
-  if(!season){
-    const { data } = await client
-      .from("seasons")
-      .insert({name:"2026"})
-      .select()
-      .single();
-    seasonId=data.id;
-  }else{
-    seasonId=season.id;
-  }
+const res=await fetch(API_URL)
+const data=await res.json()
 
-  await loadPlayers();
-  renderNewGame();
-  loadLeaderboard();
-  loadStats();
-}
+games=data.games || []
 
-async function loadPlayers(){
-  const { data } = await client.from("players").select("*");
+renderAll()
 
-  if(!data.length){
-    await client.from("players").insert([
-      {name:"Chirurgo"},
-      {name:"Anestesista"},
-      {name:"Professore"},
-      {name:"Barellista"},
-      {name:"Radiografo"},
-      {name:"Capasala"}
-    ]);
-  }
-
-  const { data: playersData } = await client.from("players").select("*");
-  players=playersData;
-
-  players.forEach(p=>{
-    document.getElementById("playerFilter").innerHTML+=
-      `<option value="${p.id}">${p.name}</option>`;
-  });
-}
-
-function renderNewGame(){
-  let html="<table><tr>";
-  players.forEach(p=>{
-    html+=`<th>${p.name}</th>`;
-  });
-  html+="</tr><tr>";
-
-  players.forEach(p=>{
-    html+=`<td><input type="number" id="p${p.id}" placeholder=""></td>`;
-  });
-
-  html+="</tr></table>";
-  document.getElementById("newGame").innerHTML=html;
 }
 
 async function saveGame(){
 
-  let total=0;
-  let values=[];
+const g={date:new Date().toLocaleString(),players:{}}
 
-  players.forEach(p=>{
-    let val=document.getElementById("p"+p.id).value;
-    if(val==="") return;
-    val=parseFloat(val);
-    total+=val;
-    values.push({player_id:p.id,score:val});
-  });
+let total=0
+let atLeastOne=false
 
-  if(total!==0){
-    alert("La somma deve essere 0");
-    return;
-  }
+document.querySelectorAll(".player").forEach(p=>{
 
-  const { data: game } = await client
-    .from("games")
-    .insert({season_id:seasonId})
-    .select()
-    .single();
+const n=p.dataset.name
+const raw=p.querySelector(".score").value
 
-  for(let v of values){
-    await client.from("game_results").insert({
-      game_id:game.id,
-      player_id:v.player_id,
-      score:v.score
-    });
-  }
+if(raw===""){
+g.players[n]={present:false,score:null}
+}else{
 
-  renderNewGame();
-  loadLeaderboard();
-  loadStats();
+const sc=Number(raw)
+
+total+=sc
+atLeastOne=true
+
+g.players[n]={present:true,score:sc}
+
 }
 
-async function loadLeaderboard(){
+})
 
-  const { data: games } = await client
-    .from("games")
-    .select("id")
-    .eq("season_id",seasonId);
-
-  if(!games.length){
-    document.getElementById("leaderboard").innerHTML="Nessuna partita";
-    return;
-  }
-
-  const ids=games.map(g=>g.id);
-
-  const { data } = await client
-    .from("game_results")
-    .select("score, players(name)")
-    .in("game_id",ids);
-
-  let totals={};
-
-  data.forEach(r=>{
-    if(!totals[r.players.name]) totals[r.players.name]=0;
-    totals[r.players.name]+=r.score;
-  });
-
-  let arr=Object.entries(totals).sort((a,b)=>b[1]-a[1]);
-
-  let html="<table><tr><th>Giocatore</th><th>Totale</th></tr>";
-
-  arr.forEach((r,i)=>{
-    html+=`<tr>
-      <td>${r[0]} ${i===0?'<span class="badge">Vincitore</span>':''}</td>
-      <td class="${r[1]>=0?'green':'red'}">${r[1]}</td>
-    </tr>`;
-  });
-
-  html+="</table>";
-  document.getElementById("leaderboard").innerHTML=html;
+if(!atLeastOne){
+alert("Inserisci almeno un risultato")
+return
 }
 
-async function loadStats(){
-
-  const filter=document.getElementById("playerFilter").value;
-
-  const { data: games } = await client
-    .from("games")
-    .select("id")
-    .eq("season_id",seasonId);
-
-  if(!games.length){
-    document.getElementById("stats").innerHTML="Nessun dato";
-    return;
-  }
-
-  const ids=games.map(g=>g.id);
-
-  let query=client
-    .from("game_results")
-    .select("score, players(name)")
-    .in("game_id",ids);
-
-  if(filter!=="all"){
-    query=query.eq("player_id",filter);
-  }
-
-  const { data } = await query;
-
-  if(!data.length){
-    document.getElementById("stats").innerHTML="Nessun dato";
-    return;
-  }
-
-  let best=data.reduce((a,b)=>a.score>b.score?a:b);
-  let worst=data.reduce((a,b)=>a.score<b.score?a:b);
-  let avg=data.reduce((s,r)=>s+r.score,0)/data.length;
-
-  document.getElementById("stats").innerHTML=
-  `Media: ${avg.toFixed(2)}<br>
-   Miglior serata: ${best.players.name} ${best.score}<br>
-   Peggior serata: ${worst.players.name} ${worst.score}`;
+if(total!==0){
+alert("La somma deve essere 0. Totale: "+total)
+return
 }
 
-async function resetSeason(){
-  if(!confirm("Sei sicuro di voler resettare la stagione?")) return;
+await fetch(API_URL,{
+method:"POST",
+body:JSON.stringify({
+action:"add",
+game:g
+})
+})
 
-  const { data: games } = await client
-    .from("games")
-    .select("id")
-    .eq("season_id",seasonId);
+document.querySelectorAll(".score").forEach(i=>i.value="")
 
-  for(let g of games){
-    await client.from("game_results").delete().eq("game_id",g.id);
-    await client.from("games").delete().eq("id",g.id);
-  }
+loadGames()
 
-  loadLeaderboard();
-  loadStats();
 }
+
+function getWinner(game){
+
+let w=null
+
+for(const p in game.players){
+
+const d=game.players[p]
+
+if(d.present && (!w || d.score>w.score))
+w={name:p,score:d.score}
+
+}
+
+return w
+
+}
+
+function renderGamesTable(){
+
+let h="<table><tr><th>#</th>"
+
+players.forEach(p=>h+=`<th>${p.name}</th>`)
+
+h+="<th>Azioni</th></tr>"
+
+games.forEach((g,i)=>{
+
+const winner=getWinner(g)
+
+h+=`<tr><td>${i+1}</td>`
+
+players.forEach(p=>{
+
+const d=g.players[p.name]
+
+if(!d||!d.present){
+
+h+=`<td class="absent">ASSENTE</td>`
+
+}else{
+
+h+=`<td class="${d.score>0?'pos':d.score<0?'neg':'neu'}">
+
+${d.score}
+
+${winner && winner.name===p.name?'<span class="badge">🏆</span>':''}
+
+</td>`
+
+}
+
+})
+
+h+=`<td>
+
+<button class="edit" onclick="editGame(${i})">✏️</button>
+
+<button class="del" onclick="deleteGame(${i})">❌</button>
+
+</td></tr>`
+
+})
+
+gamesTable.innerHTML=h+"</table>"
+
+}
+
+function editGame(i){
+
+const g=games[i]
+
+document.querySelectorAll(".player").forEach(p=>{
+
+const d=g.players[p.dataset.name]
+
+p.querySelector(".score").value=(d && d.present)?d.score:""
+
+})
+
+editIndex=i
+
+window.scrollTo({top:0,behavior:"smooth"})
+
+}
+
+async function deleteGame(i){
+
+if(!confirm("Eliminare la partita?")) return
+
+await fetch(API_URL,{
+method:"POST",
+body:JSON.stringify({
+action:"delete",
+index:i
+})
+})
+
+loadGames()
+
+}
+
+function renderRanking(){
+
+const tot={}
+
+players.forEach(p=>tot[p.name]=0)
+
+games.forEach(g=>{
+
+for(const n in g.players)
+
+if(g.players[n].present)
+tot[n]+=g.players[n].score
+
+})
+
+const sorted=Object.entries(tot).sort((a,b)=>b[1]-a[1])
+
+let h="<table><tr><th>Giocatore</th><th>Totale</th></tr>"
+
+sorted.forEach(([n,v])=>{
+
+h+=`<tr>
+
+<td>${n}</td>
+
+<td class="${v>0?'pos':v<0?'neg':'neu'}">
+
+${v>0?"+":""}${v}
+
+</td>
+
+</tr>`
+
+})
+
+ranking.innerHTML=h+"</table>"
+
+}
+
+function renderStats(){
+
+const sel=playerFilter.value
+
+if(sel==="all"){
+
+let best={v:-Infinity}
+let worst={v:Infinity}
+
+games.forEach(g=>{
+
+for(const p in g.players){
+
+const d=g.players[p]
+
+if(d.present){
+
+if(d.score>best.v) best={n:p,v:d.score}
+
+if(d.score<worst.v) worst={n:p,v:d.score}
+
+}
+
+}
+
+})
+
+stats.innerHTML=
+
+`🟢 Miglior serata: <b>${best.n||"-"} ${best.v>0?"+":""}${best.v||0}</b><br>
+
+🔴 Peggior serata: <b>${worst.n||"-"} ${worst.v||0}</b>`
+
+}else{
+
+let played=0,total=0,best=-Infinity,worst=Infinity
+
+games.forEach(g=>{
+
+const d=g.players[sel]
+
+if(d && d.present){
+
+played++
+total+=d.score
+
+if(d.score>best) best=d.score
+if(d.score<worst) worst=d.score
+
+}
+
+})
+
+if(!played){
+
+stats.innerHTML="Nessuna partita giocata"
+
+return
+
+}
+
+const avg=(total/played).toFixed(1)
+
+stats.innerHTML=
+
+`<b>${sel}</b><br><br>
+
+Partite: <b>${played}</b><br>
+
+Totale: <b>${total}</b><br>
+
+Media: <b>${avg}</b><br>
+
+Migliore: <b>${best}</b><br>
+
+Peggiore: <b>${worst}</b>`
+
+}
+
+}
+
+function renderAll(){
+
+renderRanking()
+renderStats()
+renderGamesTable()
+
+}
+
+loadGames()
 
 </script>
 
