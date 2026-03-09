@@ -1,108 +1,71 @@
 <!DOCTYPE html>
 <html lang="it">
-
 <head>
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
-<title>Clinica Assenteisti Poker</title>
+<title>Poker Clinica Assenteisti</title>
 
 <style>
 
 body{
-background:linear-gradient(180deg,#020617,#0f172a);
+background:#0f172a;
 color:white;
 font-family:system-ui;
-max-width:1100px;
+max-width:900px;
 margin:auto;
 padding:20px
 }
 
 h1{text-align:center}
 
-.logo{
-display:block;
-margin:auto;
-width:140px;
-margin-bottom:10px
-}
-
-.card{
-background:#020617;
-border:1px solid #334155;
-border-radius:12px;
-padding:15px;
-margin-bottom:20px
-}
-
 .players{
 display:grid;
-grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-gap:10px
+grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+gap:10px;
+margin-top:20px
 }
 
 .player{
 background:#020617;
 border:1px solid #334155;
-border-radius:10px;
+border-radius:8px;
 padding:10px;
 text-align:center
 }
 
-.player img{
-width:55px;
-height:55px;
-border-radius:50%;
-object-fit:cover;
-margin-bottom:5px
-}
-
-.player input{
-width:80px;
-padding:6px;
-text-align:center;
-border-radius:6px;
-border:none;
-font-size:16px
+input{
+width:70px;
+padding:5px;
+text-align:center
 }
 
 button{
-padding:10px 14px;
+padding:10px;
+margin-top:15px;
+background:#22c55e;
 border:none;
-border-radius:8px;
+border-radius:6px;
 font-weight:bold;
-cursor:pointer;
-margin:5px
+cursor:pointer
 }
-
-.save{background:#22c55e;color:black}
-.copy{background:#3b82f6}
 
 table{
 width:100%;
 border-collapse:collapse;
-margin-top:10px
+margin-top:20px
 }
 
-th{
-background:#1e293b;
-padding:6px
-}
-
-td{
+th,td{
+border:1px solid #334155;
 padding:6px;
-border-top:1px solid #334155;
 text-align:center
 }
 
-.pos{color:#22c55e;font-weight:bold}
-.neg{color:#ef4444;font-weight:bold}
-
-.assente{
-color:#64748b;
-font-style:italic
-}
+.pos{color:#22c55e}
+.neg{color:#ef4444}
+.ass{color:#64748b;font-style:italic}
 
 </style>
 
@@ -112,35 +75,17 @@ font-style:italic
 
 <h1>Clinica Assenteisti</h1>
 
-<div class="card">
-
-<h2>Nuova partita</h2>
-
 <div class="players" id="players"></div>
 
-<div style="text-align:center;margin-top:15px">
-<button class="save" onclick="saveGame()">Salva partita</button>
+<div style="text-align:center">
+<button onclick="saveGame()">Salva partita</button>
 </div>
 
-</div>
-
-<div class="card">
-
-<h2>Classifica generale</h2>
-
-<button class="copy" onclick="copyRanking()">Copia classifica</button>
-
+<h2>Classifica</h2>
 <div id="ranking"></div>
 
-</div>
-
-<div class="card">
-
-<h2>Storico partite</h2>
-
-<div id="gamesTable"></div>
-
-</div>
+<h2>Storico</h2>
+<div id="games"></div>
 
 <script>
 
@@ -158,26 +103,16 @@ const players=[
 const playersBox=document.getElementById("players")
 
 players.forEach(p=>{
-
 playersBox.innerHTML+=`
-
 <div class="player" data-name="${p}">
-
-<div><b>${p}</b></div>
-
-<input type="number" class="score" placeholder="">
-
-</div>
-
-`
-
+<div>${p}</div>
+<input type="number">
+</div>`
 })
 
 let games=[]
 
 async function loadGames(){
-
-try{
 
 const res=await fetch(API)
 const data=await res.json()
@@ -187,8 +122,6 @@ games=[]
 data.forEach(r=>{
 
 games.push({
-
-date:r[1],
 
 players:{
 Anestesista:r[2]===""?null:Number(r[2]),
@@ -203,13 +136,7 @@ Radiografo:r[7]===""?null:Number(r[7])
 
 })
 
-renderAll()
-
-}catch(e){
-
-alert("Errore caricamento dati")
-
-}
+render()
 
 }
 
@@ -217,7 +144,6 @@ async function saveGame(){
 
 let g={}
 let total=0
-let presenti=0
 
 document.querySelectorAll(".player").forEach(p=>{
 
@@ -225,33 +151,17 @@ const name=p.dataset.name
 const v=p.querySelector("input").value
 
 if(v===""){
-
-g[name]=null
-
+g[name]=""
 }else{
-
 g[name]=Number(v)
 total+=Number(v)
-presenti++
-
 }
 
 })
 
-if(presenti<2){
-
-alert("Servono almeno 2 giocatori")
-
-return
-
-}
-
 if(total!==0){
-
 alert("La somma deve essere 0")
-
 return
-
 }
 
 await fetch(API,{
@@ -265,121 +175,65 @@ loadGames()
 
 }
 
-function renderRanking(){
+function render(){
 
-let tot={}
-players.forEach(p=>tot[p]=0)
+let totals={}
+players.forEach(p=>totals[p]=0)
 
 games.forEach(g=>{
-
 for(const n in g.players){
-
 if(g.players[n]!==null){
-
-tot[n]+=g.players[n]
-
+totals[n]+=g.players[n]
 }
-
 }
-
 })
 
-let sorted=Object.entries(tot).sort((a,b)=>b[1]-a[1])
+let rank="<table><tr><th>Giocatore</th><th>Totale</th></tr>"
 
-let html="<table><tr><th>Giocatore</th><th>Totale</th></tr>"
+Object.entries(totals)
+.sort((a,b)=>b[1]-a[1])
+.forEach(([n,v])=>{
 
-sorted.forEach(([n,v])=>{
-
-html+=`<tr>
+rank+=`<tr>
 <td>${n}</td>
 <td class="${v>=0?'pos':'neg'}">${v}</td>
 </tr>`
 
 })
 
-html+="</table>"
+rank+="</table>"
 
-ranking.innerHTML=html
+ranking.innerHTML=rank
 
-}
+let hist="<table><tr><th>#</th>"
 
-function renderGames(){
+players.forEach(p=>hist+=`<th>${p}</th>`)
 
-let html="<table><tr><th>#</th>"
-
-players.forEach(p=>html+=`<th>${p}</th>`)
-
-html+="</tr>"
+hist+="</tr>"
 
 games.forEach((g,i)=>{
 
-html+=`<tr><td>${i+1}</td>`
+hist+=`<tr><td>${i+1}</td>`
 
 players.forEach(p=>{
 
-let val=g.players[p]
+let v=g.players[p]
 
-if(val===null){
-
-html+=`<td class="assente">ASSENTE</td>`
-
+if(v===null){
+hist+=`<td class="ass">ASS</td>`
 }else{
-
-html+=`<td class="${val>=0?'pos':'neg'}">${val}</td>`
-
+hist+=`<td>${v}</td>`
 }
 
 })
 
-html+="</tr>"
+hist+="</tr>"
 
 })
 
-html+="</table>"
+hist+="</table>"
 
-gamesTable.innerHTML=html
-
-}
-
-function copyRanking(){
-
-let text="Classifica Poker\n\n"
-
-let tot={}
-players.forEach(p=>tot[p]=0)
-
-games.forEach(g=>{
-
-for(const n in g.players){
-
-if(g.players[n]!==null){
-
-tot[n]+=g.players[n]
-
-}
-
-}
-
-})
-
-let sorted=Object.entries(tot).sort((a,b)=>b[1]-a[1])
-
-sorted.forEach(([n,v],i)=>{
-
-text+=`${i+1}. ${n} ${v}\n`
-
-})
-
-navigator.clipboard.writeText(text)
-
-alert("Classifica copiata")
-
-}
-
-function renderAll(){
-
-renderRanking()
-renderGames()
+games.innerHTML=hist
 
 }
 
@@ -388,5 +242,4 @@ loadGames()
 </script>
 
 </body>
-
 </html>
