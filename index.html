@@ -26,17 +26,19 @@
   .save:active { transform:translateY(2px); box-shadow: 0 2px 0 #16a34a; }
 
   table { width:100%; border-collapse:collapse; }
-  td { padding:10px 5px; border-bottom:1px solid #334155; text-align:center; font-size:0.95rem; }
+  td, th { padding:10px 5px; border-bottom:1px solid #334155; text-align:center; font-size:0.85rem; }
+  th { color: #94a3b8; font-weight: normal; background: #0f172a; }
   .pos { color:#22c55e; font-weight:bold }
   .neg { color:#ef4444; font-weight:bold }
   
   select { width:100%; padding:12px; background:#0f172a; color:#fff; border:1px solid #334155; border-radius:10px; margin-bottom:15px; font-size:1rem; }
   .stats-grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; text-align:center; }
   .stat-item { background:#0f172a; padding:10px; border-radius:10px; border:1px solid #334155; }
-  .stat-label { font-size:0.75rem; color:#94a3b8; display:block; margin-bottom:3px; }
-  .stat-val { font-size:1.1rem; font-weight:bold; }
+  .stat-label { font-size:0.7rem; color:#94a3b8; display:block; margin-bottom:3px; }
+  .stat-val { font-size:1rem; font-weight:bold; }
 
   #chartContainer { height:220px; margin-top:10px; }
+  .table-scroll { overflow-x: auto; margin-top: 5px; border-radius: 8px; }
 </style>
 </head>
 <body>
@@ -69,6 +71,13 @@
 </div>
 
 <div class="card">
+  <h2>Storico Partite</h2>
+  <div class="table-scroll" id="history-table">
+    <p style="text-align:center; color:#94a3b8;">Caricamento storico...</p>
+  </div>
+</div>
+
+<div class="card">
   <h2>Andamento Temporale</h2>
   <div id="chartContainer">
     <canvas id="pokerChart"></canvas>
@@ -90,16 +99,10 @@ const players = [
 let games = [];
 let pokerChart = null;
 
-// Popola UI Iniziale
 const box = document.getElementById("players");
 const sel = document.getElementById("playerFilter");
 players.forEach(p => {
-  box.innerHTML += `
-    <div class="player" data-name="${p.name}">
-      <img src="${p.img}" onerror="this.src='logo.png'">
-      <b>${p.name}</b>
-      <input type="text" class="score" placeholder="0" inputmode="text">
-    </div>`;
+  box.innerHTML += `<div class="player" data-name="${p.name}"><img src="${p.img}" onerror="this.src='logo.png'"><b>${p.name}</b><input type="text" class="score" placeholder="0" inputmode="text"></div>`;
   sel.innerHTML += `<option value="${p.name}">${p.name}</option>`;
 });
 
@@ -112,9 +115,8 @@ async function loadGames() {
 }
 
 async function saveGame() {
-  const g = { date: new Date().toLocaleString('it-IT'), scores: {} };
-  let total = 0, count = 0;
-  let err = false;
+  const g = { date: new Date().toLocaleDateString('it-IT'), scores: {} };
+  let total = 0, count = 0, err = false;
   document.querySelectorAll(".player").forEach(p => {
     let v = p.querySelector(".score").value.trim().replace(',', '.');
     if(v !== "") {
@@ -124,7 +126,7 @@ async function saveGame() {
     }
   });
   if(err || count === 0) return;
-  if(total !== 0) return alert("Somma deve essere 0! Attuale: " + total);
+  if(total !== 0) return alert("Somma deve essere 0! Totale: " + total);
 
   document.getElementById("btnSave").innerText = "Invio...";
   await fetch(GOOGLE_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(g) });
@@ -136,7 +138,6 @@ async function saveGame() {
 function renderStats() {
   const pName = document.getElementById("playerFilter").value;
   if(!pName || !games.length) return;
-
   let count = 0, total = 0, maxWin = 0, maxLoss = 0;
   games.forEach(g => {
     const s = g.scores[pName];
@@ -147,11 +148,25 @@ function renderStats() {
       if(val < maxLoss) maxLoss = val;
     }
   });
-
   document.getElementById("st-pres").innerText = count;
   document.getElementById("st-avg").innerText = count > 0 ? (total/count).toFixed(1) : "-";
   document.getElementById("st-win").innerText = "+" + maxWin;
   document.getElementById("st-loss").innerText = maxLoss;
+}
+
+function renderHistory() {
+  let h = "<table><tr><th>Data</th>";
+  players.forEach(p => h += `<th>${p.name.substring(0,3)}</th>`);
+  h += "</tr>";
+  [...games].reverse().forEach(g => {
+    h += `<tr><td>${g.date.split(',')[0]}</td>`;
+    players.forEach(p => {
+      const s = g.scores[p.name];
+      h += `<td class="${s>0?'pos':s<0?'neg':''}">${s ?? '-'}</td>`;
+    });
+    h += "</tr>";
+  });
+  document.getElementById("history-table").innerHTML = h + "</table>";
 }
 
 function renderAll() {
@@ -160,12 +175,11 @@ function renderAll() {
   games.forEach(g => { for (const n in g.scores) tot[n] += (Number(g.scores[n]) || 0); });
   const sorted = Object.entries(tot).sort((a,b) => b[1] - a[1]);
   let rH = "<table>";
-  sorted.forEach(([n,v], i) => {
-    rH += `<tr><td>${i+1}º ${n}</td><td class="${v>0?'pos':v<0?'neg':''}"><b>${v>0?'+':''}${v}</b></td></tr>`;
-  });
+  sorted.forEach(([n,v], i) => rH += `<tr><td>${i+1}º ${n}</td><td class="${v>0?'pos':v<0?'neg':''}"><b>${v>0?'+':''}${v}</b></td></tr>`);
   document.getElementById("ranking").innerHTML = rH + "</table>";
 
-  renderStats(); // Aggiorna stats se un medico è selezionato
+  renderStats();
+  renderHistory();
   
   // Grafico
   const ctx = document.getElementById('pokerChart').getContext('2d');
@@ -176,7 +190,7 @@ function renderAll() {
   if(pokerChart) pokerChart.destroy();
   pokerChart = new Chart(ctx, { 
     type: 'line', data: { labels: games.map((_,i)=>i+1), datasets }, 
-    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#64748b' }, grid: { color: '#334155' } }, x: { display: false } } } 
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#64748b' } }, x: { display: false } } } 
   });
 }
 
