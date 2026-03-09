@@ -12,31 +12,25 @@
   body { background:#0f172a; color:#e5e7eb; font-family:sans-serif; max-width:600px; margin:auto; padding:15px; padding-bottom:60px; }
   .logo { display:block; margin:0 auto 10px; max-width:70px }
   h1, h2 { text-align:center; font-size:1.1rem; margin-bottom:12px; color:#38bdf8; text-transform:uppercase; letter-spacing:1px; }
-  
   .card { background:#1e293b; padding:15px; border-radius:15px; margin-bottom:15px; border:1px solid #334155; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
-  
   .players { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
   .player { background:#0f172a; padding:10px; border-radius:12px; text-align:center; border:1px solid #334155 }
   .player img { width:50px; height:50px; border-radius:50%; margin-bottom:5px; object-fit:cover; border:2px solid #334155; }
   .player b { display:block; font-size:0.85rem; margin-bottom:8px; color:#94a3b8; }
   .player input { width:80%; background:#1e293b; border:1px solid #475569; color:#fff; text-align:center; padding:12px; border-radius:8px; font-size:1.2rem; }
-
   button { cursor:pointer; font-weight:bold; border:none; transition:0.2s; }
   .save { background:#22c55e; color:#000; width:100%; padding:15px; border-radius:12px; margin-top:10px; font-size:1.1rem; box-shadow: 0 4px 0 #16a34a; }
   .save:active { transform:translateY(2px); box-shadow: 0 2px 0 #16a34a; }
-
   table { width:100%; border-collapse:collapse; }
   td, th { padding:10px 5px; border-bottom:1px solid #334155; text-align:center; font-size:0.85rem; }
   th { color: #94a3b8; font-weight: normal; background: #0f172a; }
   .pos { color:#22c55e; font-weight:bold }
   .neg { color:#ef4444; font-weight:bold }
-  
   select { width:100%; padding:12px; background:#0f172a; color:#fff; border:1px solid #334155; border-radius:10px; margin-bottom:15px; font-size:1rem; }
   .stats-grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; text-align:center; }
   .stat-item { background:#0f172a; padding:10px; border-radius:10px; border:1px solid #334155; min-height: 60px; display: flex; flex-direction: column; justify-content: center; }
   .stat-label { font-size:0.7rem; color:#94a3b8; display:block; margin-bottom:3px; }
   .stat-val { font-size:0.9rem; font-weight:bold; }
-
   #chartContainer { height:280px; margin-top:10px; }
   .table-scroll { overflow-x: auto; margin-top: 5px; border-radius: 8px; max-height: 300px; }
 </style>
@@ -175,7 +169,6 @@ function renderStats() {
 }
 
 function renderAll() {
-  // Classifica
   const tot = {}; players.forEach(p => tot[p.name] = 0);
   games.forEach(g => { for (const n in g.scores) tot[n] += (Number(g.scores[n]) || 0); });
   const sorted = Object.entries(tot).sort((a,b) => b[1] - a[1]);
@@ -183,17 +176,19 @@ function renderAll() {
   sorted.forEach(([n,v], i) => rH += `<tr><td>${i+1}º ${n}</td><td class="${v>0?'pos':v<0?'neg':''}"><b>${v>0?'+':''}${v}</b></td></tr>`);
   document.getElementById("ranking").innerHTML = rH + "</table>";
 
-  // Storico con Data Pulita (GG/MM)
+  // STORICO CON FIX DATA
   let sH = "<table><tr><th>Data</th>";
   players.forEach(p => sH += `<th>${p.name.substring(0,3)}</th>`);
   sH += "</tr>";
   [...games].reverse().forEach(g => {
-    // Trasforma 09/03/2026 in 09/03
     let d = "---";
     if (g.date) {
-      let parts = g.date.split(',')[0].split(' ')[0].split('/');
-      if (parts.length >= 2) d = parts[0] + "/" + parts[1];
-      else d = g.date.substring(0,5); 
+        let cleanDate = g.date.split('T')[0].split(' ')[0].replace(/-/g, '/');
+        let parts = cleanDate.split('/');
+        if (parts.length >= 2) {
+            // Se il primo pezzo ha 4 cifre è l'anno, quindi prendiamo gli altri due
+            d = (parts[0].length === 4) ? parts[2] + "/" + parts[1] : parts[0] + "/" + parts[1];
+        }
     }
     sH += `<tr><td>${d}</td>`;
     players.forEach(p => {
@@ -206,7 +201,6 @@ function renderAll() {
 
   renderStats();
   
-  // Grafico Azionario
   const ctx = document.getElementById('pokerChart').getContext('2d');
   const datasets = players.map(p => {
     let sum = 0;
