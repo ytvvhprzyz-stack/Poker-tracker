@@ -1,244 +1,320 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clinica Assenteisti – Poker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-<title>Poker Clinica Assenteisti</title>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <style>
-
 body{
-background:#0f172a;
-color:white;
-font-family:system-ui;
-max-width:900px;
-margin:auto;
-padding:20px
+  background:#0f172a;
+  color:#e5e7eb;
+  font-family:Arial,sans-serif;
+  max-width:1200px;
+  margin:auto;
+  padding:20px;
 }
-
-h1{text-align:center}
-
-.players{
-display:grid;
-grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
-gap:10px;
-margin-top:20px
-}
-
-.player{
-background:#020617;
-border:1px solid #334155;
-border-radius:8px;
-padding:10px;
-text-align:center
-}
-
-input{
-width:70px;
-padding:5px;
-text-align:center
-}
+h1,h2{text-align:center}
+.logo{display:block;margin:0 auto 10px;max-width:160px}
 
 button{
-padding:10px;
-margin-top:15px;
-background:#22c55e;
-border:none;
-border-radius:6px;
-font-weight:bold;
-cursor:pointer
+  padding:5px 8px;
+  border:none;
+  border-radius:6px;
+  font-weight:bold;
+  cursor:pointer;
+  margin:2px;
 }
+.save{background:#22c55e;color:#000}
+.edit{background:#eab308;color:#000}
+.del{background:#ef4444;color:#fff}
+.export{background:#38bdf8;color:#000}
+
+.players{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:8px;
+}
+.player{
+  background:#020617;
+  border:1px solid #334155;
+  border-radius:8px;
+  padding:6px;
+  text-align:center;
+}
+.player img{
+  width:50px;height:50px;
+  border-radius:50%;
+  object-fit:cover
+}
+
+.table-wrap{overflow-x:auto}
 
 table{
-width:100%;
-border-collapse:collapse;
-margin-top:20px
+  width:100%;
+  border-collapse:collapse;
+  margin-top:12px;
+  font-size:11px;
 }
-
 th,td{
-border:1px solid #334155;
-padding:6px;
-text-align:center
+  border:1px solid #334155;
+  padding:3px 4px;
+  text-align:center;
+  white-space:nowrap;
+}
+th{background:#1e293b}
+
+.pos{color:#22c55e;font-weight:bold}
+.neg{color:#ef4444;font-weight:bold}
+.neu{color:#eab308;font-weight:bold}
+.absent{
+  background:#020617;
+  color:#64748b;
+  font-style:italic;
 }
 
-.pos{color:#22c55e}
-.neg{color:#ef4444}
-.ass{color:#64748b;font-style:italic}
+.badge{
+  background:#facc15;
+  color:#000;
+  font-size:10px;
+  padding:2px 5px;
+  border-radius:6px;
+  margin-left:4px;
+}
 
+.export-area{
+  background:#0f172a;
+  padding:10px;
+  font-size:11px;
+}
 </style>
-
 </head>
 
 <body>
 
+<img src="logo.png" class="logo">
 <h1>Clinica Assenteisti</h1>
 
+<h2>Nuova partita</h2>
 <div class="players" id="players"></div>
 
-<div style="text-align:center">
-<button onclick="saveGame()">Salva partita</button>
+<div style="text-align:center; margin-top:20px;">
+  <button id="btnSave" class="save" onclick="saveGame()">Salva partita</button>
 </div>
 
-<h2>Classifica</h2>
+<h2>Classifica generale</h2>
 <div id="ranking"></div>
 
-<h2>Storico</h2>
-<div id="games"></div>
+<h2>Statistiche</h2>
+<div style="text-align:center">
+  Giocatore:
+  <select id="playerFilter" onchange="renderStats()">
+    <option value="all">Tutti</option>
+  </select>
+</div>
+<div id="stats" style="text-align:center; margin-top:10px;"></div>
+
+<h2>Partite registrate</h2>
+<div class="table-wrap" id="gamesTable"></div>
+
+<div style="text-align:center; margin-top:20px;">
+  <button class="export" onclick="exportLast()">📸 Ultima partita</button>
+  <button class="export" onclick="exportAll()">📸 Tutte le partite</button>
+</div>
+
+<div id="exportBox" class="export-area" style="display:none"></div>
 
 <script>
-
-const API="https://script.google.com/macros/s/AKfycbz9dd0kPsH9LfpysTBHAz3gKxCFt-i9s9Zpfmzxi0VDFGoxtiEmAGETy08owwyygNvs/exec"
+// --- CONFIGURAZIONE GOOGLE ---
+const GOOGLE_URL = "https://script.google.com/macros/s/AKfycbxjaN0VerPlweGNh1hmH4U26IeKAcEno3srRNxh1WWydndq5bP7WXyh9RXr-aXEYHTM/exec";
 
 const players=[
-"Anestesista",
-"Chirurgo",
-"Barellista",
-"Professore",
-"Caposala",
-"Radiografo"
-]
+ {name:"Anestesista",img:"anestesista.png.jpg"},
+ {name:"Chirurgo",img:"chirurgo.jpg"},
+ {name:"Barellista",img:"barellista.jpg"},
+ {name:"Professore",img:"professore.jpg"},
+ {name:"Caposala",img:"caposala.jpg"},
+ {name:"Radiografo",img:"radiografo.jpg"}
+];
 
-const playersBox=document.getElementById("players")
+let games = [];
 
-players.forEach(p=>{
-playersBox.innerHTML+=`
-<div class="player" data-name="${p}">
-<div>${p}</div>
-<input type="number">
-</div>`
-})
-
-let games=[]
-
-async function loadGames(){
-
-const res=await fetch(API)
-const data=await res.json()
-
-games=[]
-
-data.forEach(r=>{
-
-games.push({
-
-players:{
-Anestesista:r[2]===""?null:Number(r[2]),
-Chirurgo:r[3]===""?null:Number(r[3]),
-Barellista:r[4]===""?null:Number(r[4]),
-Professore:r[5]===""?null:Number(r[5]),
-Caposala:r[6]===""?null:Number(r[6]),
-Radiografo:r[7]===""?null:Number(r[7])
-}
-
-})
-
-})
-
-render()
-
-}
-
-async function saveGame(){
-
-let g={}
-let total=0
-
-document.querySelectorAll(".player").forEach(p=>{
-
-const name=p.dataset.name
-const v=p.querySelector("input").value
-
-if(v===""){
-g[name]=""
-}else{
-g[name]=Number(v)
-total+=Number(v)
-}
-
-})
-
-if(total!==0){
-alert("La somma deve essere 0")
-return
-}
-
-await fetch(API,{
-method:"POST",
-body:JSON.stringify(g)
-})
-
-document.querySelectorAll("input").forEach(i=>i.value="")
-
-loadGames()
-
-}
-
-function render(){
-
-let totals={}
-players.forEach(p=>totals[p]=0)
-
-games.forEach(g=>{
-for(const n in g.players){
-if(g.players[n]!==null){
-totals[n]+=g.players[n]
-}
-}
-})
-
-let rank="<table><tr><th>Giocatore</th><th>Totale</th></tr>"
-
-Object.entries(totals)
-.sort((a,b)=>b[1]-a[1])
-.forEach(([n,v])=>{
-
-rank+=`<tr>
-<td>${n}</td>
-<td class="${v>=0?'pos':'neg'}">${v}</td>
-</tr>`
-
-})
-
-rank+="</table>"
-
-ranking.innerHTML=rank
-
-let hist="<table><tr><th>#</th>"
-
-players.forEach(p=>hist+=`<th>${p}</th>`)
-
-hist+="</tr>"
-
-games.forEach((g,i)=>{
-
-hist+=`<tr><td>${i+1}</td>`
+const box=document.getElementById("players");
+const filter=document.getElementById("playerFilter");
 
 players.forEach(p=>{
+ box.innerHTML+=`
+ <div class="player" data-name="${p.name}">
+  <img src="${p.img}">
+  <div><b>${p.name}</b></div>
+  <input type="number" class="score" placeholder="0">
+ </div>`;
+ filter.innerHTML+=`<option value="${p.name}">${p.name}</option>`;
+});
 
-let v=g.players[p]
-
-if(v===null){
-hist+=`<td class="ass">ASS</td>`
-}else{
-hist+=`<td>${v}</td>`
+// --- CARICAMENTO DATI ---
+async function loadGames() {
+  try {
+    const response = await fetch(GOOGLE_URL);
+    games = await response.json();
+    renderAll();
+  } catch (e) {
+    console.error("Errore caricamento:", e);
+  }
 }
 
-})
+// --- SALVATAGGIO DATI ---
+async function saveGame() {
+ const g = { date: new Date().toLocaleString(), scores: {} };
+ let total = 0;
+ let atLeastOne = false;
 
-hist+="</tr>"
+ document.querySelectorAll(".player").forEach(p => {
+  const n = p.dataset.name;
+  const raw = p.querySelector(".score").value;
 
-})
+  if(raw !== "") {
+   const sc = Number(raw);
+   total += sc;
+   atLeastOne = true;
+   g.scores[n] = sc;
+  }
+ });
 
-hist+="</table>"
+ if(!atLeastOne) return alert("Inserisci almeno un risultato.");
+ if(total !== 0) return alert("⚠️ La somma deve essere 0. Totale attuale: " + total);
 
-games.innerHTML=hist
+ const btn = document.getElementById("btnSave");
+ btn.disabled = true;
+ btn.innerText = "Salvataggio...";
 
+ try {
+   await fetch(GOOGLE_URL, {
+     method: "POST",
+     mode: "no-cors",
+     body: JSON.stringify(g)
+   });
+
+   document.querySelectorAll(".score").forEach(i => i.value = "");
+   alert("Partita inviata al foglio!");
+   setTimeout(loadGames, 2000); 
+ } catch (e) {
+   alert("Errore nel salvataggio.");
+ } finally {
+   btn.disabled = false;
+   btn.innerText = "Salva partita";
+ }
 }
 
-loadGames()
+// --- RENDERING ---
+function renderGamesTable() {
+ if (!games || games.length === 0) {
+     document.getElementById("gamesTable").innerHTML = "<p style='text-align:center'>Nessuna partita registrata.</p>";
+     return;
+ }
+ let h = "<table><tr><th>Data</th>";
+ players.forEach(p => h += `<th>${p.name}</th>`);
+ h += "</tr>";
 
+ [...games].reverse().forEach((g) => {
+  let max = -Infinity;
+  let winner = null;
+  for(let p in g.scores) {
+      if(g.scores[p] > max) { max = g.scores[p]; winner = p; }
+  }
+
+  h += `<tr><td>${g.date.split(',')[0]}</td>`;
+  players.forEach(p => {
+   const s = g.scores[p.name];
+   if(s === undefined || s === null || s === "") {
+    h += `<td class="absent">ASSENTE</td>`;
+   } else {
+    h += `<td class="${s>0?'pos':s<0?'neg':'neu'}">
+          ${s} ${winner === p.name && s > 0 ? '<span class="badge">🏆</span>' : ''}
+        </td>`;
+   }
+  });
+  h += `</tr>`;
+ });
+ document.getElementById("gamesTable").innerHTML = h + "</table>";
+}
+
+function renderRanking() {
+ const tot = {}; players.forEach(p => tot[p.name] = 0);
+ games.forEach(g => {
+  for (const n in g.scores) {
+      if(g.scores[n]) tot[n] += Number(g.scores[n]);
+  }
+ });
+ const sorted = Object.entries(tot).sort((a,b) => b[1] - a[1]);
+ let h = "<table><tr><th>Giocatore</th><th>Totale</th></tr>";
+ sorted.forEach(([n,v]) => {
+  h += `<tr><td>${n}</td><td class="${v>0?'pos':v<0?'neg':'neu'}">${v>0?"+":""}${v}</td></tr>`;
+ });
+ document.getElementById("ranking").innerHTML = h + "</table>";
+}
+
+function renderStats(){
+ const sel = playerFilter.value;
+ if(!games.length) return;
+ if(sel === "all"){
+  let best = {v:-Infinity, n:""}, worst = {v:Infinity, n:""};
+  games.forEach(g => {
+   for(let p in g.scores) {
+    if(g.scores[p] !== null && g.scores[p] !== "") {
+        if(g.scores[p] > best.v) { best.v = g.scores[p]; best.n = p; }
+        if(g.scores[p] < worst.v) { worst.v = g.scores[p]; worst.n = p; }
+    }
+   }
+  });
+  document.getElementById("stats").innerHTML = `🟢 Migliore: <b>${best.n}</b> (${best.v})<br>🔴 Peggiore: <b>${worst.n}</b> (${worst.v})`;
+ } else {
+  let played=0, total=0;
+  games.forEach(g => { if(g.scores[sel] !== undefined && g.scores[sel] !== null && g.scores[sel] !== "") { played++; total += Number(g.scores[sel]); } });
+  document.getElementById("stats").innerHTML = `<b>${sel}</b>: ${played} partite, Totale: <b>${total > 0 ? '+' : ''}${total}</b>`;
+ }
+}
+
+function renderAll() {
+ renderRanking();
+ renderStats();
+ renderGamesTable();
+}
+
+function exportPNG(name, node) {
+ const box = document.getElementById("exportBox");
+ box.innerHTML = `<img src="logo.png" class="logo">`;
+ box.appendChild(node);
+ box.style.display = "block";
+ html2canvas(box, { backgroundColor: "#0f172a", scale: 2 }).then(c => {
+  const a = document.createElement("a");
+  a.download = name;
+  a.href = c.toDataURL("image/png");
+  a.click();
+  box.style.display = "none";
+ });
+}
+
+function exportLast() {
+  const table = document.getElementById("gamesTable").querySelector("table");
+  if(!table || table.rows.length < 2) return;
+  const wrap = document.createElement("div");
+  wrap.innerHTML = "<h2>Risultato Ultima Partita</h2>";
+  const miniTable = document.createElement("table");
+  miniTable.appendChild(table.rows[0].cloneNode(true));
+  miniTable.appendChild(table.rows[1].cloneNode(true));
+  wrap.appendChild(miniTable);
+  exportPNG("ultima_partita.png", wrap);
+}
+
+function exportAll() {
+  const clone = document.getElementById("gamesTable").cloneNode(true);
+  exportPNG("tutte_le_partite.png", clone);
+}
+
+loadGames();
 </script>
 
 </body>
