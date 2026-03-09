@@ -4,90 +4,101 @@
 <head>
 
 <meta charset="UTF-8">
-
-<title>Clinica Assenteisti – Poker</title>
-
+<title>Clinica Assenteisti Poker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <style>
 
 body{
-background:#0f172a;
-color:#e5e7eb;
-font-family:Arial,sans-serif;
-max-width:1200px;
+background:linear-gradient(180deg,#020617,#0f172a);
+color:white;
+font-family:system-ui;
+max-width:1100px;
 margin:auto;
 padding:20px
 }
 
-h1,h2{text-align:center}
+h1{text-align:center}
 
 .logo{
 display:block;
-margin:0 auto 10px;
-max-width:160px
+margin:auto;
+width:140px;
+margin-bottom:10px
 }
 
-button{
-padding:5px 8px;
-border:none;
-border-radius:6px;
-font-weight:bold;
-cursor:pointer;
-margin:2px
+.card{
+background:#020617;
+border:1px solid #334155;
+border-radius:12px;
+padding:15px;
+margin-bottom:20px
 }
-
-.save{background:#22c55e;color:#000}
-.edit{background:#eab308;color:#000}
-.del{background:#ef4444;color:#fff}
 
 .players{
 display:grid;
 grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-gap:8px
+gap:10px
 }
 
 .player{
 background:#020617;
 border:1px solid #334155;
-border-radius:8px;
-padding:6px;
+border-radius:10px;
+padding:10px;
 text-align:center
 }
 
 .player img{
-width:50px;
-height:50px;
+width:55px;
+height:55px;
 border-radius:50%;
-object-fit:cover
+object-fit:cover;
+margin-bottom:5px
+}
+
+.player input{
+width:80px;
+padding:6px;
+text-align:center;
+border-radius:6px;
+border:none;
+font-size:16px
+}
+
+button{
+padding:10px 14px;
+border:none;
+border-radius:8px;
+font-weight:bold;
+cursor:pointer;
+margin:5px
+}
+
+.save{
+background:#22c55e;
+color:black
 }
 
 table{
 width:100%;
 border-collapse:collapse;
-margin-top:12px;
-font-size:11px
+margin-top:10px
 }
 
-th,td{
-border:1px solid #334155;
-padding:3px 4px;
+th{
+background:#1e293b;
+padding:6px
+}
+
+td{
+padding:6px;
+border-top:1px solid #334155;
 text-align:center
 }
 
-th{background:#1e293b}
-
 .pos{color:#22c55e;font-weight:bold}
 .neg{color:#ef4444;font-weight:bold}
-.neu{color:#eab308;font-weight:bold}
-
-.absent{
-background:#020617;
-color:#64748b;
-font-style:italic
-}
 
 </style>
 
@@ -99,19 +110,33 @@ font-style:italic
 
 <h1>Clinica Assenteisti</h1>
 
+<div class="card">
+
 <h2>Nuova partita</h2>
 
 <div class="players" id="players"></div>
 
-<div style="text-align:center">
+<div style="text-align:center;margin-top:15px">
 <button class="save" onclick="saveGame()">Salva partita</button>
 </div>
 
-<h2>Classifica generale</h2>
+</div>
+
+<div class="card">
+
+<h2>Classifica</h2>
+
 <div id="ranking"></div>
 
-<h2>Partite registrate</h2>
+</div>
+
+<div class="card">
+
+<h2>Storico partite</h2>
+
 <div id="gamesTable"></div>
+
+</div>
 
 <script>
 
@@ -138,9 +163,9 @@ box.innerHTML+=`
 
 <img src="${p.img}">
 
-<div><b>${p.name}</b></div>
+<div>${p.name}</div>
 
-<input type="number" class="score" placeholder="Risultato">
+<input type="number" class="score">
 
 </div>
 
@@ -151,6 +176,8 @@ box.innerHTML+=`
 let games=[]
 
 async function loadGames(){
+
+try{
 
 const res=await fetch(API)
 
@@ -165,19 +192,12 @@ games.push({
 date:r[1],
 
 players:{
-
-Anestesista:{present:true,score:Number(r[2])},
-
-Chirurgo:{present:true,score:Number(r[3])},
-
-Barellista:{present:true,score:Number(r[4])},
-
-Professore:{present:true,score:Number(r[5])},
-
-Caposala:{present:true,score:Number(r[6])},
-
-Radiografo:{present:true,score:Number(r[7])}
-
+Anestesista:Number(r[2]),
+Chirurgo:Number(r[3]),
+Barellista:Number(r[4]),
+Professore:Number(r[5]),
+Caposala:Number(r[6]),
+Radiografo:Number(r[7])
 }
 
 })
@@ -186,31 +206,27 @@ Radiografo:{present:true,score:Number(r[7])}
 
 renderAll()
 
+}catch(e){
+
+alert("Errore caricamento dati")
+
+}
+
 }
 
 async function saveGame(){
 
-const g={}
-
+let g={}
 let total=0
 
 document.querySelectorAll(".player").forEach(p=>{
 
 const name=p.dataset.name
+const v=p.querySelector("input").value
 
-const v=p.querySelector(".score").value
+g[name]=Number(v||0)
 
-if(v===""){
-
-g[name]=0
-
-}else{
-
-g[name]=Number(v)
-
-total+=Number(v)
-
-}
+total+=Number(v||0)
 
 })
 
@@ -222,23 +238,30 @@ return
 
 }
 
+try{
+
 await fetch(API,{
-
 method:"POST",
-
 body:JSON.stringify(g)
-
 })
 
-document.querySelectorAll(".score").forEach(i=>i.value="")
+alert("Partita salvata")
+
+document.querySelectorAll("input").forEach(i=>i.value="")
 
 loadGames()
+
+}catch(e){
+
+alert("Errore salvataggio")
+
+}
 
 }
 
 function renderRanking(){
 
-const tot={}
+let tot={}
 
 players.forEach(p=>tot[p.name]=0)
 
@@ -246,65 +269,66 @@ games.forEach(g=>{
 
 for(const n in g.players){
 
-tot[n]+=g.players[n].score
+tot[n]+=g.players[n]
 
 }
 
 })
 
-const sorted=Object.entries(tot).sort((a,b)=>b[1]-a[1])
+let sorted=Object.entries(tot).sort((a,b)=>b[1]-a[1])
 
-let h="<table><tr><th>Giocatore</th><th>Totale</th></tr>"
+let html="<table><tr><th>Giocatore</th><th>Totale</th></tr>"
 
 sorted.forEach(([n,v])=>{
 
-h+=`<tr>
+html+=`<tr>
 
 <td>${n}</td>
 
-<td class="${v>0?'pos':v<0?'neg':'neu'}">${v}</td>
+<td class="${v>=0?'pos':'neg'}">${v}</td>
 
 </tr>`
 
 })
 
-ranking.innerHTML=h+"</table>"
+html+="</table>"
+
+ranking.innerHTML=html
 
 }
 
-function renderGamesTable(){
+function renderGames(){
 
-let h="<table><tr><th>#</th>"
+let html="<table><tr><th>#</th>"
 
-players.forEach(p=>h+=`<th>${p.name}</th>`)
+players.forEach(p=>html+=`<th>${p.name}</th>`)
 
-h+="</tr>"
+html+="</tr>"
 
 games.forEach((g,i)=>{
 
-h+=`<tr><td>${i+1}</td>`
+html+=`<tr><td>${i+1}</td>`
 
 players.forEach(p=>{
 
-const d=g.players[p.name]
-
-h+=`<td class="${d.score>0?'pos':d.score<0?'neg':'neu'}">${d.score}</td>`
+html+=`<td>${g.players[p.name]}</td>`
 
 })
 
-h+="</tr>"
+html+="</tr>"
 
 })
 
-gamesTable.innerHTML=h+"</table>"
+html+="</table>"
+
+gamesTable.innerHTML=html
 
 }
 
 function renderAll(){
 
 renderRanking()
-
-renderGamesTable()
+renderGames()
 
 }
 
