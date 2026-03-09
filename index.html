@@ -183,13 +183,18 @@ function renderAll() {
   sorted.forEach(([n,v], i) => rH += `<tr><td>${i+1}º ${n}</td><td class="${v>0?'pos':v<0?'neg':''}"><b>${v>0?'+':''}${v}</b></td></tr>`);
   document.getElementById("ranking").innerHTML = rH + "</table>";
 
-  // Storico
+  // Storico con Data Pulita (GG/MM)
   let sH = "<table><tr><th>Data</th>";
   players.forEach(p => sH += `<th>${p.name.substring(0,3)}</th>`);
   sH += "</tr>";
   [...games].reverse().forEach(g => {
-    // Fix Data: se g.date non esiste usiamo "N.D."
-    let d = g.date ? g.date.split(',')[0].split(' ')[0] : "---";
+    // Trasforma 09/03/2026 in 09/03
+    let d = "---";
+    if (g.date) {
+      let parts = g.date.split(',')[0].split(' ')[0].split('/');
+      if (parts.length >= 2) d = parts[0] + "/" + parts[1];
+      else d = g.date.substring(0,5); 
+    }
     sH += `<tr><td>${d}</td>`;
     players.forEach(p => {
       const s = g.scores[p.name];
@@ -218,7 +223,7 @@ function renderAll() {
   if(pokerChart) pokerChart.destroy();
   pokerChart = new Chart(ctx, { 
     type: 'line', 
-    data: { labels: games.map((_,i)=> "Partita "+(i+1)), datasets }, 
+    data: { labels: games.map((_,i)=> "P"+(i+1)), datasets }, 
     options: { 
       maintainAspectRatio: false, 
       interaction: { mode: 'index', intersect: false },
