@@ -4,8 +4,9 @@
 <head>
 
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
 <title>Clinica Assenteisti Poker</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
 
@@ -75,10 +76,8 @@ cursor:pointer;
 margin:5px
 }
 
-.save{
-background:#22c55e;
-color:black
-}
+.save{background:#22c55e;color:black}
+.copy{background:#3b82f6}
 
 table{
 width:100%;
@@ -100,13 +99,16 @@ text-align:center
 .pos{color:#22c55e;font-weight:bold}
 .neg{color:#ef4444;font-weight:bold}
 
+.assente{
+color:#64748b;
+font-style:italic
+}
+
 </style>
 
 </head>
 
 <body>
-
-<img src="logo.png" class="logo">
 
 <h1>Clinica Assenteisti</h1>
 
@@ -124,7 +126,9 @@ text-align:center
 
 <div class="card">
 
-<h2>Classifica</h2>
+<h2>Classifica generale</h2>
+
+<button class="copy" onclick="copyRanking()">Copia classifica</button>
 
 <div id="ranking"></div>
 
@@ -143,29 +147,25 @@ text-align:center
 const API="https://script.google.com/macros/s/AKfycbz9dd0kPsH9LfpysTBHAz3gKxCFt-i9s9Zpfmzxi0VDFGoxtiEmAGETy08owwyygNvs/exec"
 
 const players=[
-
-{name:"Anestesista",img:"anestesista.png.jpg"},
-{name:"Chirurgo",img:"chirurgo.jpg"},
-{name:"Barellista",img:"barellista.jpg"},
-{name:"Professore",img:"professore.jpg"},
-{name:"Caposala",img:"caposala.jpg"},
-{name:"Radiografo",img:"radiografo.jpg"}
-
+"Anestesista",
+"Chirurgo",
+"Barellista",
+"Professore",
+"Caposala",
+"Radiografo"
 ]
 
-const box=document.getElementById("players")
+const playersBox=document.getElementById("players")
 
 players.forEach(p=>{
 
-box.innerHTML+=`
+playersBox.innerHTML+=`
 
-<div class="player" data-name="${p.name}">
+<div class="player" data-name="${p}">
 
-<img src="${p.img}">
+<div><b>${p}</b></div>
 
-<div>${p.name}</div>
-
-<input type="number" class="score">
+<input type="number" class="score" placeholder="">
 
 </div>
 
@@ -180,7 +180,6 @@ async function loadGames(){
 try{
 
 const res=await fetch(API)
-
 const data=await res.json()
 
 games=[]
@@ -192,12 +191,12 @@ games.push({
 date:r[1],
 
 players:{
-Anestesista:Number(r[2]),
-Chirurgo:Number(r[3]),
-Barellista:Number(r[4]),
-Professore:Number(r[5]),
-Caposala:Number(r[6]),
-Radiografo:Number(r[7])
+Anestesista:r[2]===""?null:Number(r[2]),
+Chirurgo:r[3]===""?null:Number(r[3]),
+Barellista:r[4]===""?null:Number(r[4]),
+Professore:r[5]===""?null:Number(r[5]),
+Caposala:r[6]===""?null:Number(r[6]),
+Radiografo:r[7]===""?null:Number(r[7])
 }
 
 })
@@ -218,17 +217,34 @@ async function saveGame(){
 
 let g={}
 let total=0
+let presenti=0
 
 document.querySelectorAll(".player").forEach(p=>{
 
 const name=p.dataset.name
 const v=p.querySelector("input").value
 
-g[name]=Number(v||0)
+if(v===""){
 
-total+=Number(v||0)
+g[name]=null
+
+}else{
+
+g[name]=Number(v)
+total+=Number(v)
+presenti++
+
+}
 
 })
+
+if(presenti<2){
+
+alert("Servono almeno 2 giocatori")
+
+return
+
+}
 
 if(total!==0){
 
@@ -238,38 +254,31 @@ return
 
 }
 
-try{
-
 await fetch(API,{
 method:"POST",
 body:JSON.stringify(g)
 })
 
-alert("Partita salvata")
-
 document.querySelectorAll("input").forEach(i=>i.value="")
 
 loadGames()
-
-}catch(e){
-
-alert("Errore salvataggio")
-
-}
 
 }
 
 function renderRanking(){
 
 let tot={}
-
-players.forEach(p=>tot[p.name]=0)
+players.forEach(p=>tot[p]=0)
 
 games.forEach(g=>{
 
 for(const n in g.players){
 
+if(g.players[n]!==null){
+
 tot[n]+=g.players[n]
+
+}
 
 }
 
@@ -282,11 +291,8 @@ let html="<table><tr><th>Giocatore</th><th>Totale</th></tr>"
 sorted.forEach(([n,v])=>{
 
 html+=`<tr>
-
 <td>${n}</td>
-
 <td class="${v>=0?'pos':'neg'}">${v}</td>
-
 </tr>`
 
 })
@@ -301,7 +307,7 @@ function renderGames(){
 
 let html="<table><tr><th>#</th>"
 
-players.forEach(p=>html+=`<th>${p.name}</th>`)
+players.forEach(p=>html+=`<th>${p}</th>`)
 
 html+="</tr>"
 
@@ -311,7 +317,17 @@ html+=`<tr><td>${i+1}</td>`
 
 players.forEach(p=>{
 
-html+=`<td>${g.players[p.name]}</td>`
+let val=g.players[p]
+
+if(val===null){
+
+html+=`<td class="assente">ASSENTE</td>`
+
+}else{
+
+html+=`<td class="${val>=0?'pos':'neg'}">${val}</td>`
+
+}
 
 })
 
@@ -322,6 +338,41 @@ html+="</tr>"
 html+="</table>"
 
 gamesTable.innerHTML=html
+
+}
+
+function copyRanking(){
+
+let text="Classifica Poker\n\n"
+
+let tot={}
+players.forEach(p=>tot[p]=0)
+
+games.forEach(g=>{
+
+for(const n in g.players){
+
+if(g.players[n]!==null){
+
+tot[n]+=g.players[n]
+
+}
+
+}
+
+})
+
+let sorted=Object.entries(tot).sort((a,b)=>b[1]-a[1])
+
+sorted.forEach(([n,v],i)=>{
+
+text+=`${i+1}. ${n} ${v}\n`
+
+})
+
+navigator.clipboard.writeText(text)
+
+alert("Classifica copiata")
 
 }
 
