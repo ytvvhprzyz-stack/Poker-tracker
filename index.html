@@ -33,12 +33,12 @@
   
   select { width:100%; padding:12px; background:#0f172a; color:#fff; border:1px solid #334155; border-radius:10px; margin-bottom:15px; font-size:1rem; }
   .stats-grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; text-align:center; }
-  .stat-item { background:#0f172a; padding:10px; border-radius:10px; border:1px solid #334155; }
+  .stat-item { background:#0f172a; padding:10px; border-radius:10px; border:1px solid #334155; min-height: 60px; display: flex; flex-direction: column; justify-content: center; }
   .stat-label { font-size:0.7rem; color:#94a3b8; display:block; margin-bottom:3px; }
-  .stat-val { font-size:1rem; font-weight:bold; }
+  .stat-val { font-size:0.9rem; font-weight:bold; }
 
-  #chartContainer { height:220px; margin-top:10px; }
-  .table-scroll { overflow-x: auto; margin-top: 5px; border-radius: 8px; }
+  #chartContainer { height:280px; margin-top:10px; }
+  .table-scroll { overflow-x: auto; margin-top: 5px; border-radius: 8px; max-height: 300px; }
 </style>
 </head>
 <body>
@@ -60,20 +60,13 @@
 <div class="card">
   <h2>Statistiche Medico</h2>
   <select id="playerFilter" onchange="renderStats()">
-    <option value="">Seleziona un Medico...</option>
+    <option value="all">Tutti i Medici (Record Assoluti)</option>
   </select>
   <div id="stats-display" class="stats-grid">
-    <div class="stat-item"><span class="stat-label">Presenze</span><span class="stat-val" id="st-pres">-</span></div>
-    <div class="stat-item"><span class="stat-label">Media Punti</span><span class="stat-val" id="st-avg">-</span></div>
-    <div class="stat-item"><span class="stat-label">Best Win</span><span class="stat-val pos" id="st-win">-</span></div>
-    <div class="stat-item"><span class="stat-label">Worst Loss</span><span class="stat-val neg" id="st-loss">-</span></div>
-  </div>
-</div>
-
-<div class="card">
-  <h2>Storico Partite</h2>
-  <div class="table-scroll" id="history-table">
-    <p style="text-align:center; color:#94a3b8;">Caricamento storico...</p>
+    <div class="stat-item"><span class="stat-label" id="label-1">Presenze</span><span class="stat-val" id="st-1">-</span></div>
+    <div class="stat-item"><span class="stat-label" id="label-2">Media Punti</span><span class="stat-val" id="st-2">-</span></div>
+    <div class="stat-item"><span class="stat-label" id="label-3">Best Win</span><span class="stat-val pos" id="st-3">-</span></div>
+    <div class="stat-item"><span class="stat-label" id="label-4">Worst Loss</span><span class="stat-val neg" id="st-4">-</span></div>
   </div>
 </div>
 
@@ -82,6 +75,11 @@
   <div id="chartContainer">
     <canvas id="pokerChart"></canvas>
   </div>
+</div>
+
+<div class="card">
+  <h2>Storico Partite</h2>
+  <div class="table-scroll" id="history-table"></div>
 </div>
 
 <script>
@@ -126,7 +124,7 @@ async function saveGame() {
     }
   });
   if(err || count === 0) return;
-  if(total !== 0) return alert("Somma deve essere 0! Totale: " + total);
+  if(total !== 0) return alert("Somma deve essere 0! Attuale: " + total);
 
   document.getElementById("btnSave").innerText = "Invio...";
   await fetch(GOOGLE_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(g) });
@@ -137,36 +135,43 @@ async function saveGame() {
 
 function renderStats() {
   const pName = document.getElementById("playerFilter").value;
-  if(!pName || !games.length) return;
-  let count = 0, total = 0, maxWin = 0, maxLoss = 0;
-  games.forEach(g => {
-    const s = g.scores[pName];
-    if(s !== undefined && s !== null && s !== "") {
-      const val = Number(s);
-      count++; total += val;
-      if(val > maxWin) maxWin = val;
-      if(val < maxLoss) maxLoss = val;
-    }
-  });
-  document.getElementById("st-pres").innerText = count;
-  document.getElementById("st-avg").innerText = count > 0 ? (total/count).toFixed(1) : "-";
-  document.getElementById("st-win").innerText = "+" + maxWin;
-  document.getElementById("st-loss").innerText = maxLoss;
-}
+  if(!games.length) return;
 
-function renderHistory() {
-  let h = "<table><tr><th>Data</th>";
-  players.forEach(p => h += `<th>${p.name.substring(0,3)}</th>`);
-  h += "</tr>";
-  [...games].reverse().forEach(g => {
-    h += `<tr><td>${g.date.split(',')[0]}</td>`;
-    players.forEach(p => {
-      const s = g.scores[p.name];
-      h += `<td class="${s>0?'pos':s<0?'neg':''}">${s ?? '-'}</td>`;
+  if (pName === "all") {
+    let best = {v: -Infinity, n: ""}, worst = {v: Infinity, n: ""};
+    games.forEach(g => {
+      for(let n in g.scores) {
+        let v = Number(g.scores[n]);
+        if(v > best.v) { best.v = v; best.n = n; }
+        if(v < worst.v) { worst.v = v; worst.n = n; }
+      }
     });
-    h += "</tr>";
-  });
-  document.getElementById("history-table").innerHTML = h + "</table>";
+    document.getElementById("label-1").innerText = "Migliore Serata";
+    document.getElementById("st-1").innerText = best.n;
+    document.getElementById("label-2").innerText = "Vincita Record";
+    document.getElementById("st-2").innerHTML = `<span class="pos">+${best.v}</span>`;
+    document.getElementById("label-3").innerText = "Peggiore Batosta";
+    document.getElementById("st-3").innerText = worst.n;
+    document.getElementById("label-4").innerText = "Perdita Record";
+    document.getElementById("st-4").innerHTML = `<span class="neg">${worst.v}</span>`;
+  } else {
+    let c = 0, t = 0, mW = 0, mL = 0;
+    games.forEach(g => {
+      const s = g.scores[pName];
+      if(s !== undefined && s !== null && s !== "") {
+        const v = Number(s); c++; t += v;
+        if(v > mW) mW = v; if(v < mL) mL = v;
+      }
+    });
+    document.getElementById("label-1").innerText = "Presenze";
+    document.getElementById("st-1").innerText = c;
+    document.getElementById("label-2").innerText = "Media Punti";
+    document.getElementById("st-2").innerText = c > 0 ? (t/c).toFixed(1) : "-";
+    document.getElementById("label-3").innerText = "Best Win";
+    document.getElementById("st-3").innerText = "+" + mW;
+    document.getElementById("label-4").innerText = "Worst Loss";
+    document.getElementById("st-4").innerText = mL;
+  }
 }
 
 function renderAll() {
@@ -178,19 +183,54 @@ function renderAll() {
   sorted.forEach(([n,v], i) => rH += `<tr><td>${i+1}º ${n}</td><td class="${v>0?'pos':v<0?'neg':''}"><b>${v>0?'+':''}${v}</b></td></tr>`);
   document.getElementById("ranking").innerHTML = rH + "</table>";
 
+  // Storico
+  let sH = "<table><tr><th>Data</th>";
+  players.forEach(p => sH += `<th>${p.name.substring(0,3)}</th>`);
+  sH += "</tr>";
+  [...games].reverse().forEach(g => {
+    // Fix Data: se g.date non esiste usiamo "N.D."
+    let d = g.date ? g.date.split(',')[0].split(' ')[0] : "---";
+    sH += `<tr><td>${d}</td>`;
+    players.forEach(p => {
+      const s = g.scores[p.name];
+      sH += `<td class="${s>0?'pos':s<0?'neg':''}">${s ?? '-'}</td>`;
+    });
+    sH += "</tr>";
+  });
+  document.getElementById("history-table").innerHTML = sH + "</table>";
+
   renderStats();
-  renderHistory();
   
-  // Grafico
+  // Grafico Azionario
   const ctx = document.getElementById('pokerChart').getContext('2d');
   const datasets = players.map(p => {
     let sum = 0;
-    return { label: p.name, data: games.map(g => { sum += (Number(g.scores[p.name]) || 0); return sum; }), borderColor: p.color, tension: 0.3, pointRadius: 2 };
+    return { 
+      label: p.name, 
+      data: games.map(g => { sum += (Number(g.scores[p.name]) || 0); return sum; }), 
+      borderColor: p.color, 
+      backgroundColor: p.color,
+      tension: 0.2, 
+      pointRadius: 4,
+      pointHoverRadius: 8
+    };
   });
   if(pokerChart) pokerChart.destroy();
   pokerChart = new Chart(ctx, { 
-    type: 'line', data: { labels: games.map((_,i)=>i+1), datasets }, 
-    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#64748b' } }, x: { display: false } } } 
+    type: 'line', 
+    data: { labels: games.map((_,i)=> "Partita "+(i+1)), datasets }, 
+    options: { 
+      maintainAspectRatio: false, 
+      interaction: { mode: 'index', intersect: false },
+      plugins: { 
+        legend: { display: true, position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 10 } },
+        tooltip: { enabled: true, backgroundColor: '#0f172a', titleColor: '#38bdf8' }
+      },
+      scales: { 
+        y: { ticks: { color: '#64748b' }, grid: { color: '#334155' } }, 
+        x: { display: false } 
+      } 
+    } 
   });
 }
 
