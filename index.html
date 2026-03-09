@@ -1,17 +1,22 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
+
 <meta charset="UTF-8">
+
 <title>Clinica Assenteisti – Poker</title>
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <style>
+
 body{
 background:#0f172a;
 color:#e5e7eb;
-font-family:Arial;
+font-family:Arial,sans-serif;
 max-width:1200px;
 margin:auto;
 padding:20px
@@ -69,8 +74,7 @@ font-size:11px
 th,td{
 border:1px solid #334155;
 padding:3px 4px;
-text-align:center;
-white-space:nowrap
+text-align:center
 }
 
 th{background:#1e293b}
@@ -85,23 +89,18 @@ color:#64748b;
 font-style:italic
 }
 
-.badge{
-background:#facc15;
-color:#000;
-font-size:10px;
-padding:2px 5px;
-border-radius:6px;
-margin-left:4px
-}
 </style>
+
 </head>
 
 <body>
 
 <img src="logo.png" class="logo">
+
 <h1>Clinica Assenteisti</h1>
 
 <h2>Nuova partita</h2>
+
 <div class="players" id="players"></div>
 
 <div style="text-align:center">
@@ -111,55 +110,79 @@ margin-left:4px
 <h2>Classifica generale</h2>
 <div id="ranking"></div>
 
-<h2>Statistiche</h2>
-
-<div style="text-align:center">
-Giocatore:
-<select id="playerFilter" onchange="renderStats()">
-<option value="all">Tutti</option>
-</select>
-</div>
-
-<div id="stats"></div>
-
 <h2>Partite registrate</h2>
 <div id="gamesTable"></div>
 
 <script>
 
-const API_URL="https://script.google.com/macros/s/AKfycbz9dd0kPsH9LfpysTBHAz3gKxCFt-i9s9Zpfmzxi0VDFGoxtiEmAGETy08owwyygNvs/exec"
+const API="https://script.google.com/macros/s/AKfycbz9dd0kPsH9LfpysTBHAz3gKxCFt-i9s9Zpfmzxi0VDFGoxtiEmAGETy08owwyygNvs/exec"
 
 const players=[
+
 {name:"Anestesista",img:"anestesista.png.jpg"},
 {name:"Chirurgo",img:"chirurgo.jpg"},
 {name:"Barellista",img:"barellista.jpg"},
 {name:"Professore",img:"professore.jpg"},
 {name:"Caposala",img:"caposala.jpg"},
 {name:"Radiografo",img:"radiografo.jpg"}
+
 ]
 
 const box=document.getElementById("players")
-const filter=document.getElementById("playerFilter")
 
 players.forEach(p=>{
+
 box.innerHTML+=`
+
 <div class="player" data-name="${p.name}">
+
 <img src="${p.img}">
+
 <div><b>${p.name}</b></div>
+
 <input type="number" class="score" placeholder="Risultato">
-</div>`
-filter.innerHTML+=`<option value="${p.name}">${p.name}</option>`
+
+</div>
+
+`
+
 })
 
 let games=[]
-let editIndex=null
 
 async function loadGames(){
 
-const res=await fetch(API_URL)
+const res=await fetch(API)
+
 const data=await res.json()
 
-games=data.games || []
+games=[]
+
+data.forEach(r=>{
+
+games.push({
+
+date:r[1],
+
+players:{
+
+Anestesista:{present:true,score:Number(r[2])},
+
+Chirurgo:{present:true,score:Number(r[3])},
+
+Barellista:{present:true,score:Number(r[4])},
+
+Professore:{present:true,score:Number(r[5])},
+
+Caposala:{present:true,score:Number(r[6])},
+
+Radiografo:{present:true,score:Number(r[7])}
+
+}
+
+})
+
+})
 
 renderAll()
 
@@ -167,151 +190,47 @@ renderAll()
 
 async function saveGame(){
 
-const g={date:new Date().toLocaleString(),players:{}}
+const g={}
 
 let total=0
-let atLeastOne=false
 
 document.querySelectorAll(".player").forEach(p=>{
 
-const n=p.dataset.name
-const raw=p.querySelector(".score").value
+const name=p.dataset.name
 
-if(raw===""){
-g.players[n]={present:false,score:null}
+const v=p.querySelector(".score").value
+
+if(v===""){
+
+g[name]=0
+
 }else{
 
-const sc=Number(raw)
+g[name]=Number(v)
 
-total+=sc
-atLeastOne=true
-
-g.players[n]={present:true,score:sc}
+total+=Number(v)
 
 }
 
 })
-
-if(!atLeastOne){
-alert("Inserisci almeno un risultato")
-return
-}
 
 if(total!==0){
-alert("La somma deve essere 0. Totale: "+total)
+
+alert("La somma deve essere 0")
+
 return
+
 }
 
-await fetch(API_URL,{
+await fetch(API,{
+
 method:"POST",
-body:JSON.stringify({
-action:"add",
-game:g
-})
+
+body:JSON.stringify(g)
+
 })
 
 document.querySelectorAll(".score").forEach(i=>i.value="")
-
-loadGames()
-
-}
-
-function getWinner(game){
-
-let w=null
-
-for(const p in game.players){
-
-const d=game.players[p]
-
-if(d.present && (!w || d.score>w.score))
-w={name:p,score:d.score}
-
-}
-
-return w
-
-}
-
-function renderGamesTable(){
-
-let h="<table><tr><th>#</th>"
-
-players.forEach(p=>h+=`<th>${p.name}</th>`)
-
-h+="<th>Azioni</th></tr>"
-
-games.forEach((g,i)=>{
-
-const winner=getWinner(g)
-
-h+=`<tr><td>${i+1}</td>`
-
-players.forEach(p=>{
-
-const d=g.players[p.name]
-
-if(!d||!d.present){
-
-h+=`<td class="absent">ASSENTE</td>`
-
-}else{
-
-h+=`<td class="${d.score>0?'pos':d.score<0?'neg':'neu'}">
-
-${d.score}
-
-${winner && winner.name===p.name?'<span class="badge">🏆</span>':''}
-
-</td>`
-
-}
-
-})
-
-h+=`<td>
-
-<button class="edit" onclick="editGame(${i})">✏️</button>
-
-<button class="del" onclick="deleteGame(${i})">❌</button>
-
-</td></tr>`
-
-})
-
-gamesTable.innerHTML=h+"</table>"
-
-}
-
-function editGame(i){
-
-const g=games[i]
-
-document.querySelectorAll(".player").forEach(p=>{
-
-const d=g.players[p.dataset.name]
-
-p.querySelector(".score").value=(d && d.present)?d.score:""
-
-})
-
-editIndex=i
-
-window.scrollTo({top:0,behavior:"smooth"})
-
-}
-
-async function deleteGame(i){
-
-if(!confirm("Eliminare la partita?")) return
-
-await fetch(API_URL,{
-method:"POST",
-body:JSON.stringify({
-action:"delete",
-index:i
-})
-})
 
 loadGames()
 
@@ -325,10 +244,11 @@ players.forEach(p=>tot[p.name]=0)
 
 games.forEach(g=>{
 
-for(const n in g.players)
+for(const n in g.players){
 
-if(g.players[n].present)
 tot[n]+=g.players[n].score
+
+}
 
 })
 
@@ -342,11 +262,7 @@ h+=`<tr>
 
 <td>${n}</td>
 
-<td class="${v>0?'pos':v<0?'neg':'neu'}">
-
-${v>0?"+":""}${v}
-
-</td>
+<td class="${v>0?'pos':v<0?'neg':'neu'}">${v}</td>
 
 </tr>`
 
@@ -356,91 +272,38 @@ ranking.innerHTML=h+"</table>"
 
 }
 
-function renderStats(){
+function renderGamesTable(){
 
-const sel=playerFilter.value
+let h="<table><tr><th>#</th>"
 
-if(sel==="all"){
+players.forEach(p=>h+=`<th>${p.name}</th>`)
 
-let best={v:-Infinity}
-let worst={v:Infinity}
+h+="</tr>"
 
-games.forEach(g=>{
+games.forEach((g,i)=>{
 
-for(const p in g.players){
+h+=`<tr><td>${i+1}</td>`
 
-const d=g.players[p]
+players.forEach(p=>{
 
-if(d.present){
+const d=g.players[p.name]
 
-if(d.score>best.v) best={n:p,v:d.score}
-
-if(d.score<worst.v) worst={n:p,v:d.score}
-
-}
-
-}
+h+=`<td class="${d.score>0?'pos':d.score<0?'neg':'neu'}">${d.score}</td>`
 
 })
 
-stats.innerHTML=
-
-`🟢 Miglior serata: <b>${best.n||"-"} ${best.v>0?"+":""}${best.v||0}</b><br>
-
-🔴 Peggior serata: <b>${worst.n||"-"} ${worst.v||0}</b>`
-
-}else{
-
-let played=0,total=0,best=-Infinity,worst=Infinity
-
-games.forEach(g=>{
-
-const d=g.players[sel]
-
-if(d && d.present){
-
-played++
-total+=d.score
-
-if(d.score>best) best=d.score
-if(d.score<worst) worst=d.score
-
-}
+h+="</tr>"
 
 })
 
-if(!played){
-
-stats.innerHTML="Nessuna partita giocata"
-
-return
-
-}
-
-const avg=(total/played).toFixed(1)
-
-stats.innerHTML=
-
-`<b>${sel}</b><br><br>
-
-Partite: <b>${played}</b><br>
-
-Totale: <b>${total}</b><br>
-
-Media: <b>${avg}</b><br>
-
-Migliore: <b>${best}</b><br>
-
-Peggiore: <b>${worst}</b>`
-
-}
+gamesTable.innerHTML=h+"</table>"
 
 }
 
 function renderAll(){
 
 renderRanking()
-renderStats()
+
 renderGamesTable()
 
 }
@@ -450,4 +313,5 @@ loadGames()
 </script>
 
 </body>
+
 </html>
