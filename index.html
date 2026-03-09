@@ -2,39 +2,40 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<title>Clinica Assenteisti – Poker</title>
+<title>Clinica Poker App</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body{background:#0f172a;color:#e5e7eb;font-family:Arial,sans-serif;max-width:800px;margin:auto;padding:15px;padding-bottom:50px;}
-h1,h2{text-align:center;margin-bottom:15px;}
-.logo{display:block;margin:0 auto 10px;max-width:100px}
+  body { background:#0f172a; color:#e5e7eb; font-family:sans-serif; max-width:600px; margin:auto; padding:15px; padding-bottom:60px; }
+  .logo { display:block; margin:0 auto 10px; max-width:80px }
+  h1, h2 { text-align:center; font-size:1.1rem; margin-bottom:12px; color:#38bdf8; text-transform:uppercase; letter-spacing:1px; }
+  
+  .card { background:#1e293b; padding:15px; border-radius:15px; margin-bottom:15px; border:1px solid #334155; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
+  
+  .players { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+  .player { background:#0f172a; padding:10px; border-radius:12px; text-align:center; border:1px solid #334155 }
+  .player img { width:50px; height:50px; border-radius:50%; margin-bottom:5px; object-fit:cover; border:2px solid #334155; }
+  .player b { display:block; font-size:0.85rem; margin-bottom:8px; color:#94a3b8; }
+  
+  /* Input ottimizzato per segni negativi */
+  .player input { width:80%; background:#1e293b; border:1px solid #475569; color:#fff; text-align:center; padding:12px; border-radius:8px; font-size:1.2rem; }
 
-button{padding:12px;border:none;border-radius:10px;font-weight:bold;cursor:pointer;transition:0.2s;}
-button:active{transform:scale(0.95);}
-.save{background:#22c55e;color:#000;width:100%;margin-top:15px;font-size:1rem;}
-.edit-btn{background:#eab308;color:#000;font-size:0.7rem;padding:5px 8px;border-radius:5px;}
+  button { cursor:pointer; font-weight:bold; border:none; transition:0.2s; }
+  .save { background:#22c55e; color:#000; width:100%; padding:15px; border-radius:12px; margin-top:10px; font-size:1.1rem; box-shadow: 0 4px 0 #16a34a; }
+  .save:active { transform:translateY(2px); box-shadow: 0 2px 0 #16a34a; }
 
-.players{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
-.player{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:10px;text-align:center;}
-.player img{width:50px;height:50px;border-radius:50%;object-fit:cover;margin-bottom:5px;}
-.player input{width:70%;background:#0f172a;border:1px solid #475569;color:#fff;text-align:center;padding:8px;border-radius:6px;font-size:1rem;}
-
-.card{background:#1e293b;padding:15px;border-radius:15px;margin-bottom:20px;border:1px solid #334155;}
-.table-wrap{overflow-x:auto;border-radius:10px;}
-table{width:100%;border-collapse:collapse;font-size:12px;}
-th,td{padding:10px 5px;text-align:center;border-bottom:1px solid #334155;}
-th{background:#334155;color:#94a3b8;}
-
-.pos{color:#22c55e;font-weight:bold}
-.neg{color:#ef4444;font-weight:bold}
-#chartContainer{height:300px;margin-top:10px;}
+  table { width:100%; border-collapse:collapse; margin-top:5px; }
+  td { padding:10px 5px; border-bottom:1px solid #334155; text-align:center; font-size:0.95rem; }
+  .pos { color:#22c55e; font-weight:bold }
+  .neg { color:#ef4444; font-weight:bold }
+  
+  #stats-box { text-align:center; line-height:1.4; font-size:0.9rem; color:#cbd5e1; }
+  #chartContainer { height:220px; margin-top:10px; }
 </style>
 </head>
-
 <body>
 
 <img src="logo.png" class="logo">
@@ -43,7 +44,7 @@ th{background:#334155;color:#94a3b8;}
 <div class="card">
   <h2>Nuova Partita</h2>
   <div class="players" id="players"></div>
-  <button id="btnSave" class="save" onclick="saveGame()">SALVA PARTITA 🎲</button>
+  <button id="btnSave" class="save" onclick="saveGame()">SALVA RISULTATI 🎲</button>
 </div>
 
 <div class="card">
@@ -59,34 +60,34 @@ th{background:#334155;color:#94a3b8;}
 </div>
 
 <div class="card">
-  <h2>Storico Partite</h2>
-  <div class="table-wrap" id="gamesTable"></div>
+  <h2>Record Storici</h2>
+  <div id="stats-box">Analisi dati in corso...</div>
 </div>
 
 <script>
 const GOOGLE_URL = "https://script.google.com/macros/s/AKfycbxjaN0VerPlweGNh1hmH4U26IeKAcEno3srRNxh1WWydndq5bP7WXyh9RXr-aXEYHTM/exec";
 
 const players = [
- {name:"Anestesista", color:"#38bdf8"},
- {name:"Chirurgo", color:"#fb7185"},
- {name:"Barellista", color:"#fbbf24"},
- {name:"Professore", color:"#a78bfa"},
- {name:"Caposala", color:"#22c55e"},
- {name:"Radiografo", color:"#f472b6"}
+ {name:"Anestesista", color:"#38bdf8", img:"anestesista.png.jpg"},
+ {name:"Chirurgo", color:"#fb7185", img:"chirurgo.jpg"},
+ {name:"Barellista", color:"#fbbf24", img:"barellista.jpg"},
+ {name:"Professore", color:"#a78bfa", img:"professore.jpg"},
+ {name:"Caposala", color:"#22c55e", img:"caposala.jpg"},
+ {name:"Radiografo", color:"#f472b6", img:"radiografo.jpg"}
 ];
 
 let games = [];
 let pokerChart = null;
 
-// Init giocatori
+// Popola UI
 const box = document.getElementById("players");
 players.forEach(p => {
   box.innerHTML += `
-  <div class="player" data-name="${p.name}">
-   <img src="${p.name.toLowerCase()}.jpg" onerror="this.src='logo.png'">
-   <div><b>${p.name}</b></div>
-   <input type="number" class="score" placeholder="0" inputmode="numeric">
-  </div>`;
+    <div class="player" data-name="${p.name}">
+      <img src="${p.img}" onerror="this.src='logo.png'">
+      <b>${p.name}</b>
+      <input type="text" class="score" placeholder="0" inputmode="text">
+    </div>`;
 });
 
 async function loadGames() {
@@ -94,99 +95,93 @@ async function loadGames() {
     const resp = await fetch(GOOGLE_URL);
     games = await resp.json();
     renderAll();
-  } catch (e) { console.log("Errore caricamento"); }
+  } catch (e) { console.error("Errore download dati"); }
 }
 
 async function saveGame() {
   const g = { date: new Date().toLocaleString('it-IT'), scores: {} };
   let total = 0, count = 0;
+  let hasError = false;
 
   document.querySelectorAll(".player").forEach(p => {
-    const n = p.dataset.name, val = p.querySelector(".score").value;
-    if(val !== "") {
-      const s = Number(val); total += s; count++;
-      g.scores[n] = s;
+    let valRaw = p.querySelector(".score").value.trim().replace(',', '.');
+    if(valRaw !== "") {
+      const s = Number(valRaw);
+      if (isNaN(s)) { alert("Inserisci solo numeri per " + p.dataset.name); hasError = true; }
+      total += s; count++; g.scores[p.dataset.name] = s;
     }
   });
 
-  if(count === 0) return alert("Inserisci dati!");
-  if(total !== 0) return alert("La somma deve essere 0! Attuale: " + total);
+  if(hasError) return;
+  if(count === 0) return alert("Inserisci i dati della partita!");
+  if(total !== 0) return alert("La somma deve fare 0! Totale attuale: " + total);
 
   const btn = document.getElementById("btnSave");
-  btn.disabled = true; btn.innerText = "Invio...";
+  btn.disabled = true; btn.innerText = "Salvataggio...";
 
   await fetch(GOOGLE_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(g) });
   
   document.querySelectorAll(".score").forEach(i => i.value = "");
-  btn.disabled = false; btn.innerText = "SALVA PARTITA 🎲";
+  btn.disabled = false; btn.innerText = "SALVA RISULTATI 🎲";
   setTimeout(loadGames, 1500);
 }
 
 function renderAll() {
-  renderRanking();
-  renderGamesTable();
-  updateChart();
-}
-
-function renderRanking() {
   const tot = {}; players.forEach(p => tot[p.name] = 0);
-  games.forEach(g => { for (const n in g.scores) if(g.scores[n]) tot[n] += Number(g.scores[n]); });
-  const sorted = Object.entries(tot).sort((a,b) => b[1] - a[1]);
-  let h = "<table>";
-  sorted.forEach(([n,v], i) => {
-    h += `<tr><td>${i+1}º ${n}</td><td class="${v>0?'pos':v<0?'neg':''}">${v>0?"+":""}${v}</td></tr>`;
-  });
-  document.getElementById("ranking").innerHTML = h + "</table>";
-}
+  let bP = {v:-Infinity, n:"", d:""}, wP = {v:Infinity, n:"", d:""};
 
-function renderGamesTable() {
-  let h = "<table><tr><th>Data</th>";
-  players.forEach(p => h += `<th>${p.name.substring(0,3)}</th>`);
-  h += "</tr>";
-  [...games].reverse().forEach((g) => {
-    h += `<tr><td>${g.date.split(' ')[0]}</td>`;
-    players.forEach(p => {
-      const s = g.scores[p.name];
-      h += `<td class="${s>0?'pos':s<0?'neg':''}">${s ?? '-'}</td>`;
-    });
-    h += "</tr>";
-  });
-  document.getElementById("gamesTable").innerHTML = h + "</table>";
-}
-
-function updateChart() {
-  const ctx = document.getElementById('pokerChart').getContext('2d');
-  const labels = games.map((_, i) => `P${i+1}`);
-  
-  const datasets = players.map(p => {
-    let sum = 0;
-    const data = games.map(g => {
-      sum += (Number(g.scores[p.name]) || 0);
-      return sum;
-    });
-    return { label: p.name, data: data, borderColor: p.color, tension: 0.3, fill: false };
-  });
-
-  if(pokerChart) pokerChart.destroy();
-  pokerChart = new Chart(ctx, {
-    type: 'line',
-    data: { labels, datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: '#94a3b8', boxWidth: 10, font: { size: 10 } } } },
-      scales: { 
-        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
-        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
-      }
+  games.forEach(g => {
+    for (const n in g.scores) {
+      const val = Number(g.scores[n]);
+      tot[n] += val;
+      if(val > bP.v) { bP.v = val; bP.n = n; bP.d = g.date.split(' ')[0]; }
+      if(val < wP.v) { wP.v = val; wP.n = n; wP.d = g.date.split(' ')[0]; }
     }
   });
+
+  // 1. Classifica
+  const sorted = Object.entries(tot).sort((a,b) => b[1] - a[1]);
+  let rH = "<table>";
+  sorted.forEach(([n,v], i) => {
+    rH += `<tr><td>${i+1}º ${n}</td><td class="${v>0?'pos':v<0?'neg':''}"><b>${v>0?'+':''}${v}</b></td></tr>`;
+  });
+  document.getElementById("ranking").innerHTML = rH + "</table>";
+
+  // 2. Stats
+  document.getElementById("stats-box").innerHTML = `
+    <p>🏆 <b>Top Score:</b> ${bP.n} (<span class="pos">+${bP.v}</span>) il ${bP.d}</p>
+    <p>🚑 <b>Big Loss:</b> ${wP.n} (<span class="neg">${wP.v}</span>) il ${wP.d}</p>
+  `;
+
+  // 3. Grafico
+  const ctx = document.getElementById('pokerChart').getContext('2d');
+  const datasets = players.map(p => {
+    let sum = 0;
+    return { 
+      label: p.name, 
+      data: games.map(g => { sum += (Number(g.scores[p.name]) || 0); return sum; }), 
+      borderColor: p.color, tension: 0.3, pointRadius: 2 
+    };
+  });
+  if(pokerChart) pokerChart.destroy();
+  pokerChart = new Chart(ctx, { 
+    type: 'line', 
+    data: { labels: games.map((_,i)=>i+1), datasets }, 
+    options: { 
+      maintainAspectRatio: false, 
+      plugins: { legend: { display: false } },
+      scales: { 
+        x: { ticks: { color: '#64748b' }, grid: { display: false } },
+        y: { ticks: { color: '#64748b' }, grid: { color: '#334155' } }
+      }
+    } 
+  });
 }
 
-// Avvio e auto-aggiornamento ogni 30 sec
 loadGames();
-setInterval(loadGames, 30000);
+setInterval(loadGames, 45000); // Aggiorna ogni 45 secondi
 </script>
 
 </body>
 </html>
+
