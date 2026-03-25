@@ -107,8 +107,13 @@ async function loadGames() {
 }
 
 async function saveGame() {
-  const g = { date: new Date().toLocaleDateString('it-IT'), scores: {} };
+  // Genera data esatta al secondo del salvataggio
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('it-IT'); // Es: 09/03/2026
+
+  const g = { date: dateStr, scores: {} };
   let total = 0, count = 0, err = false;
+  
   document.querySelectorAll(".player").forEach(p => {
     let v = p.querySelector(".score").value.trim().replace(',', '.');
     if(v !== "") {
@@ -117,14 +122,18 @@ async function saveGame() {
       total += s; count++; g.scores[p.dataset.name] = s;
     }
   });
+
   if(err || count === 0) return;
   if(total !== 0) return alert("Somma deve essere 0! Attuale: " + total);
 
   document.getElementById("btnSave").innerText = "Invio...";
   await fetch(GOOGLE_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(g) });
+  
   document.querySelectorAll(".score").forEach(i => i.value = "");
   document.getElementById("btnSave").innerText = "SALVA RISULTATI 🎲";
-  setTimeout(loadGames, 1500);
+  
+  // Ricarica forzata dopo 2 secondi
+  setTimeout(loadGames, 2000);
 }
 
 function renderStats() {
@@ -141,13 +150,13 @@ function renderStats() {
       }
     });
     document.getElementById("label-1").innerText = "Migliore Serata";
-    document.getElementById("st-1").innerText = best.n;
+    document.getElementById("st-1").innerText = best.n || "-";
     document.getElementById("label-2").innerText = "Vincita Record";
-    document.getElementById("st-2").innerHTML = `<span class="pos">+${best.v}</span>`;
+    document.getElementById("st-2").innerHTML = best.v !== -Infinity ? `<span class="pos">+${best.v}</span>` : "-";
     document.getElementById("label-3").innerText = "Peggiore Batosta";
-    document.getElementById("st-3").innerText = worst.n;
+    document.getElementById("st-3").innerText = worst.n || "-";
     document.getElementById("label-4").innerText = "Perdita Record";
-    document.getElementById("st-4").innerHTML = `<span class="neg">${worst.v}</span>`;
+    document.getElementById("st-4").innerHTML = worst.v !== Infinity ? `<span class="neg">${worst.v}</span>` : "-";
   } else {
     let c = 0, t = 0, mW = 0, mL = 0;
     games.forEach(g => {
@@ -163,8 +172,7 @@ function renderStats() {
     document.getElementById("st-2").innerText = c > 0 ? (t/c).toFixed(1) : "-";
     document.getElementById("label-3").innerText = "Best Win";
     document.getElementById("st-3").innerText = "+" + mW;
-    document.getElementById("label-4").innerText = "Worst Loss";
-    document.getElementById("st-4").innerText = mL;
+    document.getElementById("label-4").innerText = mL;
   }
 }
 
@@ -176,18 +184,25 @@ function renderAll() {
   sorted.forEach(([n,v], i) => rH += `<tr><td>${i+1}º ${n}</td><td class="${v>0?'pos':v<0?'neg':''}"><b>${v>0?'+':''}${v}</b></td></tr>`);
   document.getElementById("ranking").innerHTML = rH + "</table>";
 
-  // STORICO CON FIX DATA
+  // STORICO CON FIX DATA DEFINITIVO
   let sH = "<table><tr><th>Data</th>";
   players.forEach(p => sH += `<th>${p.name.substring(0,3)}</th>`);
   sH += "</tr>";
+  
   [...games].reverse().forEach(g => {
     let d = "---";
     if (g.date) {
-        let cleanDate = g.date.split('T')[0].split(' ')[0].replace(/-/g, '/');
-        let parts = cleanDate.split('/');
+        // Rimuove eventuali orari o scritte T00:00:00
+        let raw = String(g.date).split('T')[0].split(' ')[0].replace(/-/g, '/');
+        let parts = raw.split('/');
+        
         if (parts.length >= 2) {
-            // Se il primo pezzo ha 4 cifre è l'anno, quindi prendiamo gli altri due
-            d = (parts[0].length === 4) ? parts[2] + "/" + parts[1] : parts[0] + "/" + parts[1];
+            // Se l'anno è all'inizio (YYYY/MM/DD)
+            if (parts[0].length === 4) d = parts[2] + "/" + parts[1];
+            // Se l'anno è alla fine (DD/MM/YYYY)
+            else d = parts[0] + "/" + parts[1];
+        } else {
+            d = raw.substring(0, 5); // Fallback se è una stringa strana
         }
     }
     sH += `<tr><td>${d}</td>`;
