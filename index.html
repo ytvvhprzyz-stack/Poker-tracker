@@ -107,11 +107,11 @@ async function loadGames() {
 }
 
 async function saveGame() {
-  // Genera data esatta al secondo del salvataggio
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('it-IT'); // Es: 09/03/2026
+  // Crea la data nel formato GG/MM/AAAA
+  const d = new Date();
+  const formattedDate = d.getDate().toString().padStart(2, '0') + "/" + (d.getMonth() + 1).toString().padStart(2, '0') + "/" + d.getFullYear();
 
-  const g = { date: dateStr, scores: {} };
+  const g = { date: formattedDate, scores: {} };
   let total = 0, count = 0, err = false;
   
   document.querySelectorAll(".player").forEach(p => {
@@ -126,14 +126,20 @@ async function saveGame() {
   if(err || count === 0) return;
   if(total !== 0) return alert("Somma deve essere 0! Attuale: " + total);
 
-  document.getElementById("btnSave").innerText = "Invio...";
-  await fetch(GOOGLE_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(g) });
-  
-  document.querySelectorAll(".score").forEach(i => i.value = "");
-  document.getElementById("btnSave").innerText = "SALVA RISULTATI 🎲";
-  
-  // Ricarica forzata dopo 2 secondi
-  setTimeout(loadGames, 2000);
+  const btn = document.getElementById("btnSave");
+  btn.innerText = "Invio...";
+  btn.disabled = true;
+
+  try {
+    await fetch(GOOGLE_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(g) });
+    document.querySelectorAll(".score").forEach(i => i.value = "");
+    setTimeout(loadGames, 2000);
+  } catch (e) {
+    alert("Errore invio!");
+  } finally {
+    btn.innerText = "SALVA RISULTATI 🎲";
+    btn.disabled = false;
+  }
 }
 
 function renderStats() {
@@ -190,22 +196,17 @@ function renderAll() {
   sH += "</tr>";
   
   [...games].reverse().forEach(g => {
-    let d = "---";
+    let displayDate = "Oggi";
     if (g.date) {
-        // Rimuove eventuali orari o scritte T00:00:00
-        let raw = String(g.date).split('T')[0].split(' ')[0].replace(/-/g, '/');
-        let parts = raw.split('/');
-        
-        if (parts.length >= 2) {
-            // Se l'anno è all'inizio (YYYY/MM/DD)
-            if (parts[0].length === 4) d = parts[2] + "/" + parts[1];
-            // Se l'anno è alla fine (DD/MM/YYYY)
-            else d = parts[0] + "/" + parts[1];
+        let str = String(g.date).split('T')[0].split(' ')[0].replace(/-/g, '/');
+        let p = str.split('/');
+        if (p.length >= 2) {
+            displayDate = (p[0].length === 4) ? p[2] + "/" + p[1] : p[0] + "/" + p[1];
         } else {
-            d = raw.substring(0, 5); // Fallback se è una stringa strana
+            displayDate = str.substring(0,5);
         }
     }
-    sH += `<tr><td>${d}</td>`;
+    sH += `<tr><td>${displayDate}</td>`;
     players.forEach(p => {
       const s = g.scores[p.name];
       sH += `<td class="${s>0?'pos':s<0?'neg':''}">${s ?? '-'}</td>`;
