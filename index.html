@@ -21,6 +21,7 @@
   button { cursor:pointer; font-weight:bold; border:none; transition:0.2s; }
   .save { background:#22c55e; color:#000; width:100%; padding:15px; border-radius:12px; margin-top:10px; font-size:1.1rem; box-shadow: 0 4px 0 #16a34a; }
   .save:active { transform:translateY(2px); box-shadow: 0 2px 0 #16a34a; }
+  .save:disabled { background:#475569; box-shadow:none; transform:none; }
   table { width:100%; border-collapse:collapse; }
   td, th { padding:10px 5px; border-bottom:1px solid #334155; text-align:center; font-size:0.85rem; }
   th { color: #94a3b8; font-weight: normal; background: #0f172a; }
@@ -57,8 +58,8 @@
     <option value="all">Tutti i Medici (Record Assoluti)</option>
   </select>
   <div id="stats-display" class="stats-grid">
-    <div class="stat-item"><span class="stat-label" id="label-1">Presenze</span><span class="stat-val" id="st-1">-</span></div>
-    <div class="stat-item"><span class="stat-label" id="label-2">Media Punti</span><span class="stat-val" id="st-2">-</span></div>
+    <div class="stat-item"><span class="stat-label" id="label-1">Migliore</span><span class="stat-val" id="st-1">-</span></div>
+    <div class="stat-item"><span class="stat-label" id="label-2">Media/Rec</span><span class="stat-val" id="st-2">-</span></div>
     <div class="stat-item"><span class="stat-label" id="label-3">Best Win</span><span class="stat-val pos" id="st-3">-</span></div>
     <div class="stat-item"><span class="stat-label" id="label-4">Worst Loss</span><span class="stat-val neg" id="st-4">-</span></div>
   </div>
@@ -77,6 +78,7 @@
 </div>
 
 <script>
+// SOSTITUISCI QUESTA URL CON LA TUA NUOVA URL DI DISTRIBUZIONE GOOGLE
 const GOOGLE_URL = "https://script.google.com/macros/s/AKfycbxjaN0VerPlweGNh1hmH4U26IeKAcEno3srRNxh1WWydndq5bP7WXyh9RXr-aXEYHTM/exec";
 
 const players = [
@@ -103,13 +105,13 @@ async function loadGames() {
     const resp = await fetch(GOOGLE_URL);
     games = await resp.json();
     renderAll();
-  } catch (e) { console.error("Errore download"); }
+  } catch (e) { console.error("Errore download dati"); }
 }
 
 async function saveGame() {
-  // Crea la data nel formato GG/MM/AAAA
-  const d = new Date();
-  const formattedDate = d.getDate().toString().padStart(2, '0') + "/" + (d.getMonth() + 1).toString().padStart(2, '0') + "/" + d.getFullYear();
+  // FIX DATA: Forza il fuso orario italiano per evitare errori di giorno (24 invece di 25)
+  const options = { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Rome' };
+  const formattedDate = new Intl.DateTimeFormat('it-IT', options).format(new Date());
 
   const g = { date: formattedDate, scores: {} };
   let total = 0, count = 0, err = false;
@@ -124,18 +126,19 @@ async function saveGame() {
   });
 
   if(err || count === 0) return;
-  if(total !== 0) return alert("Somma deve essere 0! Attuale: " + total);
+  if(total !== 0) return alert("La somma deve essere 0! Attuale: " + total);
 
   const btn = document.getElementById("btnSave");
-  btn.innerText = "Invio...";
+  btn.innerText = "Salvataggio...";
   btn.disabled = true;
 
   try {
     await fetch(GOOGLE_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(g) });
     document.querySelectorAll(".score").forEach(i => i.value = "");
+    // Aspetta 2 secondi per dare tempo a Google di scrivere, poi ricarica
     setTimeout(loadGames, 2000);
   } catch (e) {
-    alert("Errore invio!");
+    alert("Errore durante il salvataggio!");
   } finally {
     btn.innerText = "SALVA RISULTATI 🎲";
     btn.disabled = false;
@@ -176,13 +179,15 @@ function renderStats() {
     document.getElementById("st-1").innerText = c;
     document.getElementById("label-2").innerText = "Media Punti";
     document.getElementById("st-2").innerText = c > 0 ? (t/c).toFixed(1) : "-";
-    document.getElementById("label-3").innerText = "Best Win";
+    document.getElementById("label-3").innerText = "Miglior Vincita";
     document.getElementById("st-3").innerText = "+" + mW;
-    document.getElementById("label-4").innerText = mL;
+    document.getElementById("label-4").innerText = "Peggior Perdita";
+    document.getElementById("st-4").innerText = mL;
   }
 }
 
 function renderAll() {
+  // Classifica Generale
   const tot = {}; players.forEach(p => tot[p.name] = 0);
   games.forEach(g => { for (const n in g.scores) tot[n] += (Number(g.scores[n]) || 0); });
   const sorted = Object.entries(tot).sort((a,b) => b[1] - a[1]);
@@ -190,20 +195,23 @@ function renderAll() {
   sorted.forEach(([n,v], i) => rH += `<tr><td>${i+1}º ${n}</td><td class="${v>0?'pos':v<0?'neg':''}"><b>${v>0?'+':''}${v}</b></td></tr>`);
   document.getElementById("ranking").innerHTML = rH + "</table>";
 
-  // STORICO CON FIX DATA DEFINITIVO
+  // Storico con Fix Data GG/MM
   let sH = "<table><tr><th>Data</th>";
   players.forEach(p => sH += `<th>${p.name.substring(0,3)}</th>`);
   sH += "</tr>";
   
   [...games].reverse().forEach(g => {
-    let displayDate = "Oggi";
+    let displayDate = "---";
     if (g.date) {
-        let str = String(g.date).split('T')[0].split(' ')[0].replace(/-/g, '/');
-        let p = str.split('/');
-        if (p.length >= 2) {
-            displayDate = (p[0].length === 4) ? p[2] + "/" + p[1] : p[0] + "/" + p[1];
+        // Tenta di creare un oggetto data valido
+        let d = new Date(g.date);
+        if (!isNaN(d.getTime())) {
+            displayDate = d.getDate().toString().padStart(2, '0') + "/" + (d.getMonth() + 1).toString().padStart(2, '0');
         } else {
-            displayDate = str.substring(0,5);
+            // Fallback manuale se Google manda stringhe strane
+            let clean = String(g.date).split('T')[0].split(' ')[0].replace(/-/g, '/');
+            let p = clean.split('/');
+            if (p.length >= 2) displayDate = (p[0].length === 4) ? p[2] + "/" + p[1] : p[0] + "/" + p[1];
         }
     }
     sH += `<tr><td>${displayDate}</td>`;
@@ -217,6 +225,7 @@ function renderAll() {
 
   renderStats();
   
+  // Grafico Azionario
   const ctx = document.getElementById('pokerChart').getContext('2d');
   const datasets = players.map(p => {
     let sum = 0;
@@ -250,6 +259,7 @@ function renderAll() {
 }
 
 loadGames();
+// Auto-aggiornamento ogni minuto
 setInterval(loadGames, 60000);
 </script>
 </body>
