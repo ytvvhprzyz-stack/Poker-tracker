@@ -9,7 +9,7 @@
 <style>
   body { background:#0f172a; color:#e5e7eb; font-family:sans-serif; max-width:600px; margin:auto; padding:15px; padding-bottom:60px; }
   .logo { display:block; margin:0 auto 10px; max-width:70px }
-  h1, h2 { text-align:center; font-size:1.1rem; margin-bottom:12px; color:#38bdf8; text-transform:uppercase; letter-spacing:1px; }
+  h1, h2 { text-align:center; font-size:1.1rem; margin-bottom:12px; color:#38bdf8; text-transform:uppercase; letter-spacing:1px; cursor:default; }
   .card { background:#1e293b; padding:15px; border-radius:15px; margin-bottom:15px; border:1px solid #334155; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
   .players { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
   .player { background:#0f172a; padding:10px; border-radius:12px; text-align:center; border:1px solid #334155 }
@@ -19,6 +19,7 @@
   button { cursor:pointer; font-weight:bold; border:none; transition:0.2s; }
   .save { background:#22c55e; color:#000; width:100%; padding:15px; border-radius:12px; margin-top:10px; font-size:1.1rem; box-shadow: 0 4px 0 #16a34a; }
   .save:active { transform:translateY(2px); box-shadow: 0 2px 0 #16a34a; }
+  .save:disabled { background:#475569; box-shadow:none; transform:none; color:#fff; }
   table { width:100%; border-collapse:collapse; }
   td, th { padding:10px 5px; border-bottom:1px solid #334155; text-align:center; font-size:0.85rem; }
   th { color: #94a3b8; font-weight: normal; background: #0f172a; }
@@ -31,16 +32,16 @@
   .stat-val { font-size:0.9rem; font-weight:bold; }
   #chartContainer { height:280px; margin-top:10px; }
   .table-scroll { overflow-x: auto; margin-top: 5px; border-radius: 8px; max-height: 300px; }
-  .btn-sync { background:transparent; color:#475569; width:100%; padding:10px; font-size:0.75rem; margin-top:20px; border:1px dashed #334155; border-radius:8px; }
 </style>
 </head>
 <body>
 
 <img src="logo.png" class="logo">
-<h1>Clinica Assenteisti</h1>
+<!-- Cliccando qui sopra si attiva il reset nascosto -->
+<h1 onclick="resetFakeData()">Clinica Assenteisti</h1>
 
 <div class="card">
-  <h2>Nuova Partita (Simulazione)</h2>
+  <h2>Nuova Partita</h2>
   <div class="players" id="players"></div>
   <button id="btnSave" class="save" onclick="saveGame()">SALVA RISULTATI 🎲</button>
 </div>
@@ -75,11 +76,7 @@
   <div class="table-scroll" id="history-table"></div>
 </div>
 
-<!-- Tasto discreto per ripulire i dati fake e tornare a quelli veri -->
-<button class="btn-sync" onclick="resetFakeData()">🔄 Sincronizza Dati Clinica</button>
-
 <script>
-// URL REALE PER SCARICARE I DATI DI PARTENZA
 const GOOGLE_URL = "https://script.google.com/macros/s/AKfycbxjaN0VerPlweGNh1hmH4U26IeKAcEno3srRNxh1WWydndq5bP7WXyh9RXr-aXEYHTM/exec";
 
 const players = [
@@ -101,21 +98,15 @@ players.forEach(p => {
   sel.innerHTML += `<option value="${p.name}">${p.name}</option>`;
 });
 
-// SCARICA I DATI VERI E INJECTA QUELLI FAKE LOCALI
 async function loadGames() {
   try {
     const resp = await fetch(GOOGLE_URL);
     const realGames = await resp.json();
-    
-    // Prende le eventuali partite fake salvate sul telefono
     const localFake = localStorage.getItem('clinica_fake_games');
     const fakeGames = localFake ? JSON.parse(localFake) : [];
-    
-    // Unisce la storia vera con i dati inventati stasera
     games = [...realGames, ...fakeGames];
     renderAll();
   } catch (e) { 
-    console.error("Errore download dati reali, provo solo locale");
     const localFake = localStorage.getItem('clinica_fake_games');
     games = localFake ? JSON.parse(localFake) : [];
     renderAll();
@@ -133,7 +124,7 @@ function saveGame() {
     let v = p.querySelector(".score").value.trim().replace(',', '.');
     if(v !== "") {
       const s = Number(v);
-      if (isNaN(s)) { alert("Solo numeri!"); err = true; }
+      if (isNaN(s)) { alert("Solo numeri per " + p.dataset.name); err = true; }
       total += s; count++; g.scores[p.dataset.name] = s;
     }
   });
@@ -141,19 +132,28 @@ function saveGame() {
   if(err || count === 0) return;
   if(total !== 0) return alert("La somma deve essere 0! Attuale: " + total);
 
-  // SALVA IL GIOCO FAKE NELLA MEMORIA DEL TELEFONO
-  const localFake = localStorage.getItem('clinica_fake_games');
-  const fakeGames = localFake ? JSON.parse(localFake) : [];
-  fakeGames.push(g);
-  localStorage.setItem('clinica_fake_games', JSON.stringify(fakeGames));
-  
-  document.querySelectorAll(".score").forEach(i => i.value = "");
-  loadGames();
-  alert("Risultati aggiornati localmente! Alibi pronto. 😉");
+  // EFFETTO CARICAMENTO IDENTICO ALL'ORIGINALE
+  const btn = document.getElementById("btnSave");
+  btn.innerText = "Salvataggio...";
+  btn.disabled = true;
+
+  // Salva localmente dopo una finta attesa di rete di 1.5 secondi
+  setTimeout(() => {
+    const localFake = localStorage.getItem('clinica_fake_games');
+    const fakeGames = localFake ? JSON.parse(localFake) : [];
+    fakeGames.push(g);
+    localStorage.setItem('clinica_fake_games', JSON.stringify(fakeGames));
+    
+    document.querySelectorAll(".score").forEach(i => i.value = "");
+    btn.innerText = "SALVA RISULTATI 🎲";
+    btn.disabled = false;
+    loadGames();
+  }, 1500);
 }
 
+// COPERTURA PER IL RESET: Sembra un messaggio tecnico di aggiornamento
 function resetFakeData() {
-  if(confirm("Vuoi cancellare i dati simulati e ricaricare la classifica reale?")) {
+  if(confirm("Aggiornare l'applicazione e ricaricare i dati dal server?")) {
     localStorage.removeItem('clinica_fake_games');
     loadGames();
   }
@@ -268,4 +268,3 @@ loadGames();
 </script>
 </body>
 </html>
-
