@@ -1,1 +1,271 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Clinica Poker App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+  body { background:#0f172a; color:#e5e7eb; font-family:sans-serif; max-width:600px; margin:auto; padding:15px; padding-bottom:60px; }
+  .logo { display:block; margin:0 auto 10px; max-width:70px }
+  h1, h2 { text-align:center; font-size:1.1rem; margin-bottom:12px; color:#38bdf8; text-transform:uppercase; letter-spacing:1px; }
+  .card { background:#1e293b; padding:15px; border-radius:15px; margin-bottom:15px; border:1px solid #334155; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
+  .players { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+  .player { background:#0f172a; padding:10px; border-radius:12px; text-align:center; border:1px solid #334155 }
+  .player img { width:50px; height:50px; border-radius:50%; margin-bottom:5px; object-fit:cover; border:2px solid #334155; }
+  .player b { display:block; font-size:0.85rem; margin-bottom:8px; color:#94a3b8; }
+  .player input { width:80%; background:#1e293b; border:1px solid #475569; color:#fff; text-align:center; padding:12px; border-radius:8px; font-size:1.2rem; }
+  button { cursor:pointer; font-weight:bold; border:none; transition:0.2s; }
+  .save { background:#22c55e; color:#000; width:100%; padding:15px; border-radius:12px; margin-top:10px; font-size:1.1rem; box-shadow: 0 4px 0 #16a34a; }
+  .save:active { transform:translateY(2px); box-shadow: 0 2px 0 #16a34a; }
+  table { width:100%; border-collapse:collapse; }
+  td, th { padding:10px 5px; border-bottom:1px solid #334155; text-align:center; font-size:0.85rem; }
+  th { color: #94a3b8; font-weight: normal; background: #0f172a; }
+  .pos { color:#22c55e; font-weight:bold }
+  .neg { color:#ef4444; font-weight:bold }
+  select { width:100%; padding:12px; background:#0f172a; color:#fff; border:1px solid #334155; border-radius:10px; margin-bottom:15px; font-size:1rem; }
+  .stats-grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; text-align:center; }
+  .stat-item { background:#0f172a; padding:10px; border-radius:10px; border:1px solid #334155; min-height: 60px; display: flex; flex-direction: column; justify-content: center; }
+  .stat-label { font-size:0.7rem; color:#94a3b8; display:block; margin-bottom:3px; }
+  .stat-val { font-size:0.9rem; font-weight:bold; }
+  #chartContainer { height:280px; margin-top:10px; }
+  .table-scroll { overflow-x: auto; margin-top: 5px; border-radius: 8px; max-height: 300px; }
+  .btn-sync { background:transparent; color:#475569; width:100%; padding:10px; font-size:0.75rem; margin-top:20px; border:1px dashed #334155; border-radius:8px; }
+</style>
+</head>
+<body>
+
+<img src="logo.png" class="logo">
+<h1>Clinica Assenteisti</h1>
+
+<div class="card">
+  <h2>Nuova Partita (Simulazione)</h2>
+  <div class="players" id="players"></div>
+  <button id="btnSave" class="save" onclick="saveGame()">SALVA RISULTATI 🎲</button>
+</div>
+
+<div class="card">
+  <h2>Classifica Generale</h2>
+  <div id="ranking"></div>
+</div>
+
+<div class="card">
+  <h2>Statistiche Medico</h2>
+  <select id="playerFilter" onchange="renderStats()">
+    <option value="all">Tutti i Medici (Record Assoluti)</option>
+  </select>
+  <div id="stats-display" class="stats-grid">
+    <div class="stat-item"><span class="stat-label" id="label-1">Migliore</span><span class="stat-val" id="st-1">-</span></div>
+    <div class="stat-item"><span class="stat-label" id="label-2">Media/Rec</span><span class="stat-val" id="st-2">-</span></div>
+    <div class="stat-item"><span class="stat-label" id="label-3">Best Win</span><span class="stat-val pos" id="st-3">-</span></div>
+    <div class="stat-item"><span class="stat-label" id="label-4">Worst Loss</span><span class="stat-val neg" id="st-4">-</span></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Andamento Temporale</h2>
+  <div id="chartContainer">
+    <canvas id="pokerChart"></canvas>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Storico Partite</h2>
+  <div class="table-scroll" id="history-table"></div>
+</div>
+
+<!-- Tasto discreto per ripulire i dati fake e tornare a quelli veri -->
+<button class="btn-sync" onclick="resetFakeData()">🔄 Sincronizza Dati Clinica</button>
+
+<script>
+// URL REALE PER SCARICARE I DATI DI PARTENZA
+const GOOGLE_URL = "https://script.google.com/macros/s/AKfycbxjaN0VerPlweGNh1hmH4U26IeKAcEno3srRNxh1WWydndq5bP7WXyh9RXr-aXEYHTM/exec";
+
+const players = [
+ {name:"Anestesista", color:"#38bdf8", img:"anestesista.png.jpg"},
+ {name:"Chirurgo", color:"#fb7185", img:"chirurgo.jpg"},
+ {name:"Barellista", color:"#fbbf24", img:"barellista.jpg"},
+ {name:"Professore", color:"#a78bfa", img:"professore.jpg"},
+ {name:"Caposala", color:"#22c55e", img:"caposala.jpg"},
+ {name:"Radiografo", color:"#f472b6", img:"radiografo.jpg"}
+];
+
+let games = [];
+let pokerChart = null;
+
+const box = document.getElementById("players");
+const sel = document.getElementById("playerFilter");
+players.forEach(p => {
+  box.innerHTML += `<div class="player" data-name="${p.name}"><img src="${p.img}" onerror="this.src='logo.png'"><b>${p.name}</b><input type="text" class="score" placeholder="0" inputmode="text"></div>`;
+  sel.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+});
+
+// SCARICA I DATI VERI E INJECTA QUELLI FAKE LOCALI
+async function loadGames() {
+  try {
+    const resp = await fetch(GOOGLE_URL);
+    const realGames = await resp.json();
+    
+    // Prende le eventuali partite fake salvate sul telefono
+    const localFake = localStorage.getItem('clinica_fake_games');
+    const fakeGames = localFake ? JSON.parse(localFake) : [];
+    
+    // Unisce la storia vera con i dati inventati stasera
+    games = [...realGames, ...fakeGames];
+    renderAll();
+  } catch (e) { 
+    console.error("Errore download dati reali, provo solo locale");
+    const localFake = localStorage.getItem('clinica_fake_games');
+    games = localFake ? JSON.parse(localFake) : [];
+    renderAll();
+  }
+}
+
+function saveGame() {
+  const options = { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Rome' };
+  const formattedDate = new Intl.DateTimeFormat('it-IT', options).format(new Date());
+
+  const g = { date: formattedDate, scores: {} };
+  let total = 0, count = 0, err = false;
+  
+  document.querySelectorAll(".player").forEach(p => {
+    let v = p.querySelector(".score").value.trim().replace(',', '.');
+    if(v !== "") {
+      const s = Number(v);
+      if (isNaN(s)) { alert("Solo numeri!"); err = true; }
+      total += s; count++; g.scores[p.dataset.name] = s;
+    }
+  });
+
+  if(err || count === 0) return;
+  if(total !== 0) return alert("La somma deve essere 0! Attuale: " + total);
+
+  // SALVA IL GIOCO FAKE NELLA MEMORIA DEL TELEFONO
+  const localFake = localStorage.getItem('clinica_fake_games');
+  const fakeGames = localFake ? JSON.parse(localFake) : [];
+  fakeGames.push(g);
+  localStorage.setItem('clinica_fake_games', JSON.stringify(fakeGames));
+  
+  document.querySelectorAll(".score").forEach(i => i.value = "");
+  loadGames();
+  alert("Risultati aggiornati localmente! Alibi pronto. 😉");
+}
+
+function resetFakeData() {
+  if(confirm("Vuoi cancellare i dati simulati e ricaricare la classifica reale?")) {
+    localStorage.removeItem('clinica_fake_games');
+    loadGames();
+  }
+}
+
+function renderStats() {
+  const pName = document.getElementById("playerFilter").value;
+  if(!games.length) return;
+
+  if (pName === "all") {
+    let best = {v: -Infinity, n: ""}, worst = {v: Infinity, n: ""};
+    games.forEach(g => {
+      for(let n in g.scores) {
+        let v = Number(g.scores[n]);
+        if(v > best.v) { best.v = v; best.n = n; }
+        if(v < worst.v) { worst.v = v; worst.n = n; }
+      }
+    });
+    document.getElementById("label-1").innerText = "Migliore Serata";
+    document.getElementById("st-1").innerText = best.n || "-";
+    document.getElementById("label-2").innerText = "Vincita Record";
+    document.getElementById("st-2").innerHTML = best.v !== -Infinity ? `<span class="pos">+${best.v}</span>` : "-";
+    document.getElementById("label-3").innerText = "Peggiore Batosta";
+    document.getElementById("st-3").innerText = worst.n || "-";
+    document.getElementById("label-4").innerText = "Perdita Record";
+    document.getElementById("st-4").innerHTML = worst.v !== Infinity ? `<span class="neg">${worst.v}</span>` : "-";
+  } else {
+    let c = 0, t = 0, mW = 0, mL = 0;
+    games.forEach(g => {
+      const s = g.scores[pName];
+      if(s !== undefined && s !== null && s !== "") {
+        const v = Number(s); c++; t += v;
+        if(v > mW) mW = v; if(v < mL) mL = v;
+      }
+    });
+    document.getElementById("label-1").innerText = "Presenze";
+    document.getElementById("st-1").innerText = c;
+    document.getElementById("label-2").innerText = "Media Punti";
+    document.getElementById("st-2").innerText = c > 0 ? (t/c).toFixed(1) : "-";
+    document.getElementById("label-3").innerText = "Miglior Vincita";
+    document.getElementById("st-3").innerText = "+" + mW;
+    document.getElementById("label-4").innerText = "Peggior Perdita";
+    document.getElementById("st-4").innerText = mL;
+  }
+}
+
+function renderAll() {
+  const tot = {}; players.forEach(p => tot[p.name] = 0);
+  games.forEach(g => { for (const n in g.scores) tot[n] += (Number(g.scores[n]) || 0); });
+  const sorted = Object.entries(tot).sort((a,b) => b[1] - a[1]);
+  let rH = "<table>";
+  sorted.forEach(([n,v], i) => rH += `<tr><td>${i+1}º ${n}</td><td class="${v>0?'pos':v<0?'neg':''}"><b>${v>0?'+':''}${v}</b></td></tr>`);
+  document.getElementById("ranking").innerHTML = rH + "</table>";
+
+  let sH = "<table><tr><th>Data</th>";
+  players.forEach(p => sH += `<th>${p.name.substring(0,3)}</th>`);
+  sH += "</tr>";
+  
+  [...games].reverse().forEach(g => {
+    let displayDate = "---";
+    if (g.date) {
+        let d = new Date(g.date);
+        if (!isNaN(d.getTime())) {
+            displayDate = d.getDate().toString().padStart(2, '0') + "/" + (d.getMonth() + 1).toString().padStart(2, '0');
+        } else {
+            let clean = String(g.date).split('T')[0].split(' ')[0].replace(/-/g, '/');
+            let p = clean.split('/');
+            if (p.length >= 2) displayDate = (p[0].length === 4) ? p[2] + "/" + p[1] : p[0] + "/" + p[1];
+        }
+    }
+    sH += `<tr><td>${displayDate}</td>`;
+    players.forEach(p => {
+      const s = g.scores[p.name];
+      sH += `<td class="${s>0?'pos':s<0?'neg':''}">${s ?? '-'}</td>`;
+    });
+    sH += "</tr>";
+  });
+  document.getElementById("history-table").innerHTML = sH + "</table>";
+
+  renderStats();
+  
+  const ctx = document.getElementById('pokerChart').getContext('2d');
+  const datasets = players.map(p => {
+    let sum = 0;
+    return { 
+      label: p.name, 
+      data: games.map(g => { sum += (Number(g.scores[p.name]) || 0); return sum; }), 
+      borderColor: p.color, 
+      backgroundColor: p.color,
+      tension: 0.2, 
+      pointRadius: 4,
+      pointHoverRadius: 8
+    };
+  });
+  if(pokerChart) pokerChart.destroy();
+  pokerChart = new Chart(ctx, { 
+    type: 'line', 
+    data: { labels: games.map((_,i)=> "P"+(i+1)), datasets }, 
+    options: { 
+      maintainAspectRatio: false, 
+      interaction: { mode: 'index', intersect: false },
+      plugins: { 
+        legend: { display: true, position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 10 } },
+        tooltip: { enabled: true, backgroundColor: '#0f172a', titleColor: '#38bdf8' }
+      },
+      scales: { y: { ticks: { color: '#64748b' }, grid: { color: '#334155' } }, x: { display: false } } 
+    } 
+  });
+}
+
+loadGames();
+</script>
+</body>
+</html>
 
